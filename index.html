@@ -1,0 +1,1929 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#05060a">
+<title>ROBLOX — Вселенная</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/rubik-mono-one@5/400.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/oswald@5/500.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/oswald@5/700.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/manrope@5/400.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/manrope@5/600.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/manrope@5/800.css">
+<style>
+  :root{
+    --red:#ff2b3d;
+    --red-deep:#e2231a;
+    --cyan:#39e6ff;
+    --bg:#05060a;
+    --text:#f4f6ff;
+    --muted:#9aa3b5;
+    --glass:rgba(255,255,255,.055);
+    --stroke:rgba(255,255,255,.12);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Manrope',sans-serif;
+    user-select:none;
+  }
+
+  canvas#scene{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:1}
+
+  /* ---------- vignette ---------- */
+  .vignette{
+    position:fixed;inset:0;z-index:3;pointer-events:none;
+    background:radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(0,0,0,.55) 100%);
+  }
+
+  /* ---------- soap entrance + edit flash ---------- */
+  canvas#scene, main, .vignette{
+    transition:filter 2.6s cubic-bezier(.2,.65,.25,1), transform 2.6s cubic-bezier(.2,.65,.25,1);
+    will-change:filter,transform;
+  }
+  body.soapy canvas#scene{filter:blur(32px) saturate(1.75) brightness(1.22);transform:scale(1.09)}
+  body.soapy main{filter:blur(16px);transform:scale(1.05)}
+  body.soapy .vignette{filter:blur(6px)}
+  #flash{
+    position:fixed;inset:0;z-index:4;pointer-events:none;opacity:0;mix-blend-mode:screen;
+    background:radial-gradient(ellipse at 50% 50%, rgba(255,255,255,.95), rgba(255,64,96,.4) 55%, transparent 100%);
+  }
+
+  /* ---------- loader ---------- */
+  #loader{
+    position:fixed;inset:0;z-index:100;
+    background:
+      radial-gradient(ellipse at 50% 38%, rgba(30,34,58,.95), rgba(5,6,10,.99) 62%),
+      var(--bg);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+    transition:transform .8s cubic-bezier(.75,0,.25,1), opacity .8s;
+    overflow:hidden;
+  }
+  #loader::before{
+    content:'';position:absolute;inset:-30%;pointer-events:none;
+    background:radial-gradient(circle at 50% 45%, rgba(255,43,61,.18), transparent 58%);
+    animation:loaderGlow 5s ease-in-out infinite;
+  }
+  @keyframes loaderGlow{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.12)}}
+  body.ready #loader{transform:translateY(-100%);opacity:.4;pointer-events:none}
+
+  /* 3D-кубик */
+  .load-stage{position:relative;width:150px;height:150px;display:grid;place-items:center;perspective:620px}
+  .load-halo{
+    position:absolute;width:190px;height:190px;border-radius:50%;
+    background:radial-gradient(circle, rgba(57,230,255,.30), rgba(255,43,61,.22) 46%, transparent 70%);
+    filter:blur(7px);animation:haloPulse 3.4s ease-in-out infinite;
+  }
+  @keyframes haloPulse{50%{transform:scale(1.16);opacity:.65}}
+  .load-cube{width:54px;height:54px;position:relative;transform-style:preserve-3d;animation:cubeSpin 7.5s linear infinite}
+  .load-cube i{
+    position:absolute;inset:0;border-radius:5px;
+    background:linear-gradient(135deg,#ff3d4d,#b3141f);
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.22), inset 0 -14px 24px rgba(0,0,0,.35);
+  }
+  .load-cube i:nth-child(1){transform:translateZ(27px)}
+  .load-cube i:nth-child(2){transform:rotateY(180deg) translateZ(27px);background:linear-gradient(135deg,#c31722,#7d0d15)}
+  .load-cube i:nth-child(3){transform:rotateY(90deg) translateZ(27px);background:linear-gradient(135deg,#ff5a4a,#cf2418)}
+  .load-cube i:nth-child(4){transform:rotateY(-90deg) translateZ(27px);background:linear-gradient(135deg,#ff8a3d,#c22a12)}
+  .load-cube i:nth-child(5){transform:rotateX(90deg) translateZ(27px);background:linear-gradient(135deg,#ffe08a,#ff3d4d)}
+  .load-cube i:nth-child(6){transform:rotateX(-90deg) translateZ(27px);background:linear-gradient(135deg,#8b1019,#4a070d)}
+  @keyframes cubeSpin{from{transform:rotateX(-22deg) rotateY(0deg)}to{transform:rotateX(-22deg) rotateY(360deg)}}
+
+  .loader-name{
+    font-family:'Rubik Mono One';letter-spacing:.35em;font-size:17px;padding-left:.35em;
+    text-shadow:0 0 26px rgba(255,43,61,.35);
+  }
+  .loader-status{
+    font-family:'Oswald';font-size:10.5px;letter-spacing:.26em;text-transform:uppercase;
+    color:var(--muted);min-height:13px;
+  }
+  .loader-bar{
+    width:min(320px,72vw);height:4px;border-radius:99px;overflow:hidden;
+    background:rgba(255,255,255,.08);box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);
+  }
+  .loader-bar b{
+    display:block;height:100%;width:0%;border-radius:99px;
+    background:linear-gradient(90deg,#e2231a,#ff2b3d 62%,#ff9a3d);
+    box-shadow:0 0 16px rgba(255,43,61,.85);transition:width .15s linear;
+  }
+  .loader-pct{font-size:11px;color:var(--muted);letter-spacing:.24em}
+  .enter-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;opacity:0;transform:translateY(16px);transition:.6s cubic-bezier(.4,0,.2,1);pointer-events:none;min-height:52px}
+  #loader.can-enter .enter-row{opacity:1;transform:none;pointer-events:auto}
+  #loader.can-enter .loader-pct{color:var(--red)}
+
+  /* ---------- nav ---------- */
+  nav{
+    position:fixed;top:0;left:0;right:0;z-index:20;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:22px clamp(20px,4vw,54px);
+    opacity:0;transform:translateY(-16px);transition:.8s .9s;
+  }
+  body.ready nav{opacity:1;transform:none}
+  .brand{display:flex;align-items:center;gap:13px}
+  .brand-cube{
+    width:26px;height:26px;background:var(--red);border-radius:5px;position:relative;
+    transform:rotate(-14deg);box-shadow:0 6px 20px rgba(255,43,61,.5);
+  }
+  .brand-cube::after{
+    content:'';position:absolute;inset:31%;background:var(--bg);border-radius:2px;
+  }
+  .brand b{font-family:'Rubik Mono One';font-size:14px;letter-spacing:.1em}
+  .brand small{color:var(--red);font-weight:900;margin-left:.5em;letter-spacing:.04em}
+  #brandSub:empty{margin-left:0}
+  .menu{display:flex;gap:clamp(14px,2.6vw,38px)}
+  .menu button{
+    background:none;border:0;color:var(--muted);font-family:'Oswald';font-weight:500;
+    font-size:clamp(11px,1.1vw,13.5px);letter-spacing:.18em;text-transform:uppercase;
+    padding:6px 2px;position:relative;transition:color .3s;
+  }
+  .menu button i{font-style:normal;color:var(--red);font-size:.82em;margin-right:6px;opacity:.85}
+  .menu button::after{
+    content:'';position:absolute;left:0;bottom:-2px;height:2px;width:100%;background:var(--red);
+    border-radius:2px;transform:scaleX(0);transform-origin:left;transition:transform .35s cubic-bezier(.6,0,.2,1);
+  }
+  .menu button:hover{color:#fff}
+  .menu button.active{color:#fff}
+  .menu button.active::after{transform:scaleX(1)}
+  #soundBtn{
+    background:var(--glass);border:1px solid var(--stroke);color:var(--text);
+    width:40px;height:40px;border-radius:12px;font-size:15px;transition:.3s;backdrop-filter:blur(8px);
+  }
+  #soundBtn:hover{border-color:var(--red);color:var(--red)}
+
+  /* ---------- panels ---------- */
+  main{position:fixed;inset:0;z-index:10;pointer-events:none}
+  .panel{
+    position:absolute;top:50%;transform:translateY(calc(-50% + 46px));
+    left:clamp(22px,7vw,120px);
+    width:min(560px,92vw);
+    opacity:0;filter:blur(10px);
+    transition:opacity .65s ease,transform .65s cubic-bezier(.5,0,.2,1),filter .65s;
+    pointer-events:none;
+  }
+  .panel.align-right{left:auto;right:clamp(22px,6vw,110px)}
+  .panel.active{opacity:1;filter:blur(0);transform:translateY(-50%);pointer-events:auto}
+  .panel::before{
+    content:'';position:absolute;inset:-14% -18% -16% -22%;z-index:-1;pointer-events:none;
+    background:radial-gradient(ellipse at 40% 50%, rgba(4,5,10,.82) 0%, rgba(4,5,10,.5) 42%, rgba(4,5,10,0) 74%);
+  }
+  .panel.align-right::before{
+    background:radial-gradient(ellipse at 60% 50%, rgba(4,5,10,.82) 0%, rgba(4,5,10,.5) 42%, rgba(4,5,10,0) 74%);
+  }
+  .panel>*{opacity:0;transform:translateY(24px);transition:opacity .6s,transform .6s cubic-bezier(.4,0,.2,1)}
+  .panel.active>*{opacity:1;transform:none}
+  .panel.active>*:nth-child(1){transition-delay:.18s}
+  .panel.active>*:nth-child(2){transition-delay:.28s}
+  .panel.active>*:nth-child(3){transition-delay:.38s}
+  .panel.active>*:nth-child(4){transition-delay:.48s}
+  .panel.active>*:nth-child(5){transition-delay:.58s}
+
+  .kicker{
+    display:inline-flex;align-items:center;gap:9px;
+    font-family:'Oswald';font-size:12px;font-weight:600;letter-spacing:.32em;text-transform:uppercase;color:var(--red);
+    margin-bottom:18px;
+  }
+  .kicker::before{content:'';width:26px;height:2px;background:var(--red);border-radius:2px}
+  .live-dot{width:7px;height:7px;border-radius:50%;background:#2bff88;box-shadow:0 0 10px #2bff88;animation:pulse-dot 1.4s infinite}
+  @keyframes pulse-dot{50%{opacity:.35}}
+
+  h1{
+    font-family:'Rubik Mono One';font-weight:400;
+    font-size:clamp(26px,3.8vw,46px);line-height:1.14;letter-spacing:.01em;
+  }
+  h2{font-family:'Oswald';font-weight:700;font-size:clamp(26px,3.4vw,44px);line-height:1.08;letter-spacing:.02em;margin-bottom:16px}
+  .grad{
+    background:linear-gradient(92deg,var(--red) 10%,#ff7a3d 60%,#ffd23d 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    filter:drop-shadow(0 8px 30px rgba(255,43,61,.35));
+  }
+  .panel p{color:var(--muted);font-size:clamp(14px,1.25vw,16.5px);line-height:1.65;margin-top:18px;max-width:46ch}
+  .panel p b{color:#fff}
+
+  .btns{display:flex;gap:14px;margin-top:30px;flex-wrap:wrap}
+  .btn{
+    pointer-events:auto;border:0;font-family:'Oswald';font-weight:700;font-size:13px;
+    letter-spacing:.18em;text-transform:uppercase;padding:16px 28px;border-radius:14px;
+    transition:.3s;display:inline-flex;align-items:center;gap:10px;
+  }
+  .btn.primary{
+    background:linear-gradient(135deg,var(--red),#ff5a3d);color:#fff;
+    box-shadow:0 12px 34px rgba(255,43,61,.4), inset 0 1px 0 rgba(255,255,255,.25);
+    animation:breath 2.6s infinite;
+  }
+  @keyframes breath{50%{box-shadow:0 12px 44px rgba(255,43,61,.62), inset 0 1px 0 rgba(255,255,255,.25)}}
+  .btn.primary:hover{transform:translateY(-3px) scale(1.02);box-shadow:0 18px 44px rgba(255,43,61,.55)}
+  .btn.ghost{
+    background:var(--glass);color:var(--text);border:1px solid var(--stroke);backdrop-filter:blur(8px);
+  }
+  .btn.ghost:hover{border-color:var(--red);color:var(--red);transform:translateY(-3px)}
+
+  /* game cards */
+  .cards{
+    display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:8px;
+    width:min(600px,88vw);
+  }
+  .card{
+    pointer-events:auto;
+    background:var(--glass);border:1px solid var(--stroke);border-radius:18px;
+    padding:18px 18px 16px;backdrop-filter:blur(12px);
+    transition:.35s cubic-bezier(.4,0,.2,1);
+  }
+  .card:hover{
+    transform:translateY(-5px);border-color:rgba(255,43,61,.65);
+    box-shadow:0 16px 40px rgba(255,43,61,.22);
+    background:rgba(255,43,61,.07);
+  }
+  .card .ico{font-size:26px;display:block;margin-bottom:10px}
+  .card b{font-family:'Oswald';font-size:14px;font-weight:700;display:block;letter-spacing:.06em}
+  .card span{font-size:12px;color:var(--muted);display:block;margin-top:6px}
+  .card .visits{color:var(--cyan);font-weight:600;margin-top:8px;font-size:11.5px;letter-spacing:.06em}
+
+  /* avatar swatches */
+  .swatches{display:flex;gap:10px;margin-top:22px}
+  .swatches i{
+    width:34px;height:34px;border-radius:10px;border:2px solid rgba(255,255,255,.25);
+    display:block;transition:.3s;
+  }
+  .swatches i:hover{transform:scale(1.15) rotate(-6deg);border-color:#fff}
+
+  /* stats */
+  .stats{display:flex;gap:clamp(18px,3vw,44px);margin-top:26px;flex-wrap:wrap}
+  .stat b{
+    font-family:'Oswald';font-weight:700;font-size:clamp(28px,3.4vw,44px);color:#fff;display:block;letter-spacing:.02em;
+  }
+  .stat b em{color:var(--red);font-style:normal}
+  .stat span{font-size:12px;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;display:block;margin-top:6px}
+
+  /* ---------- HUD ---------- */
+  .indicator{
+    position:fixed;left:clamp(20px,4vw,54px);bottom:26px;z-index:20;
+    display:flex;align-items:center;gap:14px;
+    opacity:0;transition:.8s 1.2s;
+  }
+  body.ready .indicator{opacity:1}
+  .indicator span{font-family:'Oswald';font-size:11px;color:var(--muted);letter-spacing:.18em}
+  .indicator #indNum{color:#fff;font-weight:700}
+  .indicator .bar{width:110px;height:2px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden}
+  .indicator .bar b{display:block;height:100%;width:25%;background:var(--red);border-radius:2px;transition:width .7s cubic-bezier(.6,0,.2,1)}
+
+  .hint{
+    position:fixed;left:50%;bottom:26px;transform:translateX(-50%);z-index:20;
+    font-size:11px;letter-spacing:.28em;color:rgba(255,255,255,.35);text-transform:uppercase;
+    opacity:0;transition:opacity .8s 1.6s;white-space:nowrap;
+  }
+  body.ready .hint{opacity:1}
+
+  #syncToast{
+    position:fixed;left:50%;bottom:72px;transform:translate(-50%,10px);z-index:60;
+    font-family:'Oswald';font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    color:#fff;background:rgba(255,43,61,.16);border:1px solid rgba(255,43,61,.5);
+    padding:9px 16px;border-radius:11px;backdrop-filter:blur(8px);
+    opacity:0;pointer-events:none;transition:.25s cubic-bezier(.4,0,.2,1);
+  }
+  #syncToast.on{opacity:1;transform:translate(-50%,0)}
+
+  .disclaimer{
+    position:fixed;right:clamp(20px,4vw,54px);bottom:26px;z-index:20;
+    font-size:10.5px;color:rgba(255,255,255,.28);letter-spacing:.06em;
+    opacity:0;transition:opacity .8s 1.6s;
+  }
+  body.ready .disclaimer{opacity:1}
+
+  /* ---------- dock: громкость + режим ---------- */
+  .dock{
+    position:fixed;right:clamp(18px,3.4vw,44px);bottom:58px;z-index:22;
+    display:flex;flex-direction:column;gap:11px;align-items:flex-end;
+    padding:12px 14px;border-radius:18px;
+    background:linear-gradient(180deg, rgba(20,23,38,.82), rgba(8,9,15,.78));
+    border:1px solid rgba(255,255,255,.13);
+    backdrop-filter:blur(16px) saturate(1.2);
+    box-shadow:0 18px 48px rgba(0,0,0,.55), 0 0 40px rgba(255,43,61,.10);
+    opacity:0;transform:translateY(10px);pointer-events:none;
+    transition:opacity .6s cubic-bezier(.4,0,.2,1) .9s, transform .6s cubic-bezier(.4,0,.2,1) .9s, box-shadow .5s;
+  }
+  body.ready .dock{opacity:1;transform:none;pointer-events:auto}
+  .dock:hover{box-shadow:0 18px 48px rgba(0,0,0,.6), 0 0 46px rgba(255,43,61,.2)}
+  .dock-vol{display:flex;align-items:center;gap:10px}
+  .dock-ico{
+    width:26px;height:26px;border-radius:9px;border:1px solid rgba(255,255,255,.14);
+    background:rgba(255,255,255,.05);font-size:12px;line-height:1;display:grid;place-items:center;
+    transition:.25s;
+  }
+  .dock-ico:hover{border-color:rgba(255,43,61,.7);box-shadow:0 0 16px rgba(255,43,61,.35)}
+  #vol{
+    -webkit-appearance:none;appearance:none;width:120px;height:4px;border-radius:99px;outline:none;cursor:pointer;
+    background:linear-gradient(90deg,#ff2b3d 0%, #ff7a3d var(--v,62%), rgba(255,255,255,.13) var(--v,62%));
+    box-shadow:0 0 12px rgba(255,43,61,.25);
+  }
+  #vol::-webkit-slider-thumb{
+    -webkit-appearance:none;width:14px;height:14px;border-radius:50%;cursor:pointer;
+    background:radial-gradient(circle at 35% 30%, #fff, #ff5a3d 55%, #b3141f);
+    box-shadow:0 0 10px rgba(255,43,61,.95), 0 0 26px rgba(255,43,61,.55);
+    transition:transform .15s, box-shadow .2s;
+  }
+  #vol:hover::-webkit-slider-thumb{transform:scale(1.18);box-shadow:0 0 14px rgba(255,43,61,1), 0 0 34px rgba(255,43,61,.7)}
+  #vol::-moz-range-thumb{
+    width:14px;height:14px;border:0;border-radius:50%;cursor:pointer;
+    background:radial-gradient(circle at 35% 30%, #fff, #ff5a3d 55%, #b3141f);
+    box-shadow:0 0 10px rgba(255,43,61,.95), 0 0 26px rgba(255,43,61,.55);
+  }
+  .mode-switch{
+    position:relative;display:flex;gap:2px;padding:4px;border-radius:13px;
+    background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.1);
+  }
+  .ms-thumb{
+    position:absolute;top:4px;left:4px;width:calc(50% - 5px);height:calc(100% - 8px);
+    border-radius:10px;pointer-events:none;
+    background:linear-gradient(135deg, rgba(255,43,61,.95), rgba(255,110,61,.85));
+    box-shadow:0 6px 18px rgba(255,43,61,.5), 0 0 22px rgba(255,90,61,.35) inset;
+    transition:transform .45s cubic-bezier(.6,0,.2,1), background .45s, box-shadow .45s;
+  }
+  .mode-switch[data-skin="gym"] .ms-thumb{
+    transform:translateX(calc(100% + 2px));
+    background:linear-gradient(135deg, rgba(120,200,140,.95), rgba(40,120,70,.92));
+    box-shadow:0 6px 18px rgba(60,200,120,.4), 0 0 22px rgba(120,255,180,.3) inset;
+  }
+  .mode-switch[data-mode="night"] .ms-thumb{
+    transform:translateX(calc(100% + 2px));
+    background:linear-gradient(135deg, rgba(86,124,220,.95), rgba(38,58,132,.92));
+    box-shadow:0 6px 18px rgba(70,110,255,.45), 0 0 22px rgba(120,160,255,.35) inset;
+  }
+  .mode-switch button{
+    position:relative;z-index:2;border:0;background:none;cursor:pointer;
+    padding:8px 13px;border-radius:10px;white-space:nowrap;
+    font-family:'Oswald';font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--muted);transition:color .35s;
+  }
+  .mode-switch button.on{color:#fff}
+  .mode-switch button:hover{color:#fff}
+  @media (max-width:900px){
+    .disclaimer{display:none}
+  }
+  @media (max-width:760px){
+    .panel{top:auto;bottom:11vh;transform:translateY(40px);left:20px !important;right:20px !important;width:auto}
+    .panel.active{transform:translateY(0)}
+    .cards{grid-template-columns:1fr 1fr;gap:10px}
+    .card{padding:13px}
+    .hint{display:none}
+    .disclaimer{display:none}
+    .menu{gap:12px}
+    .menu button span.lbl{display:none}
+    .dock{bottom:50px;right:14px;padding:9px 10px;gap:8px;transform:scale(.92);transform-origin:bottom right}
+    #vol{width:88px}
+    nav{padding:16px 20px}
+  }
+</style>
+</head>
+<body class="soapy">
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="load-stage">
+    <div class="load-halo"></div>
+    <div class="load-cube"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  </div>
+  <div class="loader-name">ROBLOX</div>
+  <div class="loader-status" id="loadStatus">загружаем миры…</div>
+  <div class="loader-bar"><b id="loadBar"></b></div>
+  <div class="loader-pct" id="loadPct">0%</div>
+  <div class="enter-row" id="enterRow">
+    <button class="btn primary" id="enterBtn" data-hover>🎧&nbsp; С битом</button>
+    <button class="btn ghost" id="enterMute" data-hover>🌙&nbsp; У костра</button>
+  </div>
+</div>
+
+<audio id="music" src="track.mp3" loop preload="auto"></audio>
+
+<canvas id="scene"></canvas>
+<div class="vignette"></div>
+<div id="flash"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="brand" data-hover>
+    <div class="brand-cube"></div>
+    <b>ROBLOX<small id="brandSub"></small></b>
+  </div>
+  <div class="menu">
+    <button data-view="home" class="active" data-hover><i>01</i><span class="lbl">Главная</span></button>
+    <button data-view="games" data-hover><i>02</i><span class="lbl">Игры</span></button>
+    <button data-view="avatars" data-hover><i>03</i><span class="lbl">Аватары</span></button>
+    <button data-view="about" data-hover><i>04</i><span class="lbl">О платформе</span></button>
+  </div>
+  <button id="soundBtn" data-hover title="Звук">🔊</button>
+</nav>
+
+<!-- DOCK: звук + режим -->
+<div class="dock" id="dock">
+  <div class="dock-vol">
+    <button class="dock-ico" id="dockMute" title="Звук">🔊</button>
+    <input id="vol" type="range" min="0" max="100" value="62" aria-label="Громкость">
+  </div>
+  <div class="mode-switch" id="modeSwitch" data-mode="day">
+    <i class="ms-thumb"></i>
+    <button data-mode="day" class="on">🎧 Бит</button>
+    <button data-mode="night">🌙 Ночь</button>
+  </div>
+  <div class="mode-switch" id="skinSwitch" data-skin="camp">
+    <i class="ms-thumb"></i>
+    <button data-skin="camp" class="on">🏕 Кэмп</button>
+    <button data-skin="gym">💪 Кач</button>
+  </div>
+</div>
+
+<!-- PANELS -->
+<main>
+  <section class="panel active" data-view="home">
+    <div class="kicker"><span class="live-dot"></span> более 5 млн игроков онлайн</div>
+    <h1>ДОБРО ПОЖАЛОВАТЬ<br>В <span class="grad">ROBLOX</span></h1>
+    <p>Миллионы пользовательских миров, друзья и приключения — <b>в одном клике</b>. Исследуй вселенную, где каждый может создать свою игру.</p>
+    <div class="btns">
+      <button class="btn primary" id="playBtn" data-hover>▶&nbsp; Играть сейчас</button>
+      <button class="btn ghost" data-goto="1" data-hover>Смотреть игры&nbsp;→</button>
+    </div>
+  </section>
+
+  <section class="panel align-right" data-view="games">
+    <div class="kicker">01 · каталог</div>
+    <h2>ПОПУЛЯРНЫЕ <span class="grad">ИГРЫ</span></h2>
+    <div class="cards">
+      <div class="card" data-hover><span class="ico">🏠</span><b>Adopt Me!</b><span>Симулятор усыновления питомцев</span><span class="visits">▶ 30+ млрд визитов</span></div>
+      <div class="card" data-hover><span class="ico">🏘️</span><b>Brookhaven RP</b><span>Ролевой город без правил</span><span class="visits">▶ 50+ млрд визитов</span></div>
+      <div class="card" data-hover><span class="ico">🔺</span><b>Tower of Hell</b><span>Обби-башня без чекпоинтов</span><span class="visits">▶ 22+ млрд визитов</span></div>
+      <div class="card" data-hover><span class="ico">🔪</span><b>Murder Mystery 2</b><span>Найди убийцу раньше, чем...</span><span class="visits">▶ 5+ млрд визитов</span></div>
+    </div>
+  </section>
+
+  <section class="panel" data-view="avatars">
+    <div class="kicker">02 · персонализация</div>
+    <h2>ТВОЙ АВАТАР —<br><span class="grad">ТВОИ ПРАВИЛА</span></h2>
+    <p>Чёрная кепка, классический <b>адидас</b> с тремя полосками и качание головой под бит — когда играет трек, персонаж полностью в теме. Два скина — «Кэмп» и «Кач» — собраны из настоящих текстур пака.</p>
+    <div class="swatches" id="swatches">
+      <i data-hover></i><i data-hover></i><i data-hover></i><i data-hover></i>
+    </div>
+    <div class="btns">
+      <button class="btn primary" id="randomBtn" data-hover>🎲 Случайный костюм</button>
+      <button class="btn ghost" id="capBtn" data-hover>🧢 Кепка: снята</button>
+    </div>
+  </section>
+
+  <section class="panel" data-view="about">
+    <div class="kicker">03 · о платформе</div>
+    <h2>ЦИФРЫ ГОВОРЯТ<br><span class="grad">САМИ ЗА СЕБЯ</span></h2>
+    <div class="stats">
+      <div class="stat"><b><span class="num" data-to="200">0</span><em> млн+</em></b><span>игроков в месяц</span></div>
+      <div class="stat"><b><span class="num" data-to="40">0</span><em> млн+</em></b><span>миров создано</span></div>
+      <div class="stat"><b><span class="num" data-to="5">0</span><em> млн+</em></b><span>онлайн сейчас</span></div>
+    </div>
+    <p>Roblox — это не просто игра, а <b>целая платформа</b>, где сообщество создаёт контент: от паркуров и тайкунов до полноценных шутеров и концертов.</p>
+  </section>
+</main>
+
+<!-- HUD -->
+<div class="indicator">
+  <span id="indNum">01</span>
+  <div class="bar"><b id="indBar"></b></div>
+  <span>04</span>
+</div>
+<div class="hint">← → &nbsp;·&nbsp; свайп &nbsp;·&nbsp; мышь &nbsp;·&nbsp; [ ] синхрон</div>
+<div id="syncToast"></div>
+<div class="disclaimer">Фанатский концепт. Не аффилирован с Roblox Corporation.</div>
+
+<script src="tex-data.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* ================= helpers ================= */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const easeInOut = k => k < .5 ? 4*k*k*k : 1 - Math.pow(-2*k+2,3)/2;
+const linear = k => k;
+
+const anims = [];
+function animate({dur, delay=0, ease=easeInOut, update, done}){
+  anims.push({start: performance.now()+delay, dur, ease, update, done});
+}
+function runAnims(now){
+  for(let i=anims.length-1;i>=0;i--){
+    const a = anims[i];
+    if(now < a.start) continue;
+    const k = Math.min((now-a.start)/a.dur, 1);
+    a.update(a.ease(k), k);
+    if(k>=1){ anims.splice(i,1); a.done && a.done(); }
+  }
+}
+
+/* ================= sound ================= */
+let audioCtx = null, muted = false;
+let masterVol = 62;
+try{ const sv = localStorage.getItem('rbxVol'); if(sv !== null) masterVol = Math.max(0, Math.min(100, +sv)); }catch(e){}
+let fxK = 1, mode = 'day', entered = false, nightMode = false, musicMode = false;
+function applyVolume(){
+  const v = masterVol/100;
+  audioEl.volume = v*.95;
+  audioEl.muted = muted || v <= 0;
+  const volEl = $('#vol');
+  if(volEl){ volEl.value = masterVol; volEl.style.setProperty('--v', masterVol + '%'); }
+  const ico = (muted || v <= 0) ? '🔇' : (v < .4 ? '🔉' : '🔊');
+  const sb = $('#soundBtn'); if(sb) sb.textContent = ico;
+  const dm = $('#dockMute'); if(dm) dm.textContent = ico;
+}
+/* ---------- скины: КЭМП / КАЧ — ТЕКСТУРЫ ИЗ ПАКА (pack-textures.png) ----------
+   Материал на каждую грань блока: [+X, -X, +Y, -Y, +Z (перед), -Z (спина)].
+   Плитки нарезаны и подогнаны по соотношению сторон грани в build_textures.py,
+   поэтому принт не растянут: недостающее поле продолжено краем самой ткани. */
+let skinName = 'camp';
+const SKIN_TEX = window.SKIN_TEX || {};
+const SKIN_COLORS = window.SKIN_COLORS || {};
+const texCache = {};
+function skinTex(key){
+  if(!SKIN_TEX[key]) return null;
+  if(texCache[key]) return texCache[key];
+  const t = new THREE.TextureLoader().load(SKIN_TEX[key]);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  texCache[key] = t;
+  return t;
+}
+function skinMat(key, rough){
+  const m = new THREE.MeshStandardMaterial({roughness: rough == null ? .78 : rough, metalness: 0});
+  const t = skinTex(key);
+  if(t) m.map = t; else m.color.set(0x2a2a30);
+  return m;
+}
+const skinSolid = (color, rough) => new THREE.MeshStandardMaterial({color, roughness: rough == null ? .6 : rough});
+
+const SKIN_MATS = {};
+function skinKit(name){
+  if(SKIN_MATS[name]) return SKIN_MATS[name];
+  const M = (k, r) => skinMat(k, r);
+  const K = {name};
+  if(name === 'gym'){
+    K.skin  = skinSolid(SKIN_COLORS.gym_skin  || '#e3e2e9', .55);
+    K.torso = [M('gym_torso_side'), M('gym_torso_side'), M('gym_torso_cap'),
+               M('gym_torso_bot'),  M('gym_torso_front'), M('gym_torso_back')];
+    K.arm   = [M('gym_arm_side'), M('gym_arm_side'), M('gym_arm_cap'),
+               M('gym_arm_cap'),  M('gym_arm_front'), M('gym_arm_front')];
+    K.head  = {r:M('gym_head_side'), l:M('gym_head_side'), t:M('gym_head_top'),
+               b:K.skin, back:M('gym_head_back')};
+    K.hairMat = M('gym_hair', .96);
+    K.shoeL = [M('gym_shoe_sideL'), M('gym_shoe_sideL'), M('gym_shoe_topL'),
+               M('gym_shoe_sole'),  M('gym_shoe_toeL'),  M('gym_shoe_heelL')];
+    K.shoeR = [M('gym_shoe_sideR'), M('gym_shoe_sideR'), M('gym_shoe_topR'),
+               M('gym_shoe_sole'),  M('gym_shoe_toeR'),  M('gym_shoe_heelR')];
+  } else {
+    K.skin  = skinSolid(SKIN_COLORS.camp_skin || '#F5CD30', .55);
+    K.torso = [M('camp_torso_side'), M('camp_torso_side'), M('camp_torso_cap'),
+               M('camp_torso_bot'),  M('camp_torso_front'), M('camp_torso_back')];
+    K.arm   = [M('camp_arm_side'), M('camp_arm_side'), M('camp_arm_cap'),
+               M('camp_arm_cap'),  M('camp_arm_front'), M('camp_arm_front')];
+    K.head  = {r:M('camp_head_side'), l:M('camp_head_side'), t:M('camp_head_top'),
+               b:K.skin, back:M('camp_head_back')};
+    K.hairMat = M('camp_hair', .96);
+    K.shoeL = [M('camp_shoe_sideL'), M('camp_shoe_sideL'), M('camp_shoe_topL'),
+               M('camp_shoe_topL'),  M('camp_shoe_toeL'),  M('camp_shoe_heelL')];
+    K.shoeR = [M('camp_shoe_sideR'), M('camp_shoe_sideR'), M('camp_shoe_topR'),
+               M('camp_shoe_topR'),  M('camp_shoe_toeR'),  M('camp_shoe_heelR')];
+  }
+  /* штаны: бедро и голень — две половины одной брючины */
+  K.legs = {};
+  ['L','R'].forEach(s => {
+    const p = name === 'gym' ? 'gym' : 'camp';
+    K.legs[s] = {
+      thigh: [M(p+'_leg_front'+s+'_t'), M(p+'_leg_front'+s+'_t'), M(p+'_leg_front'+s+'_t'),
+              M(p+'_leg_front'+s+'_t'), M(p+'_leg_front'+s+'_t'), M(p+'_leg_back'+s+'_t')],
+      shin:  [M(p+'_leg_front'+s+'_s'), M(p+'_leg_front'+s+'_s'), M(p+'_leg_front'+s+'_s'),
+              M(p+'_leg_front'+s+'_s'), M(p+'_leg_front'+s+'_s'), M(p+'_leg_back'+s+'_s')]
+    };
+  });
+  SKIN_MATS[name] = K;
+  return K;
+}
+const headMats = K => [K.head.r, K.head.l, K.head.t, K.head.b, headFace, K.head.back];
+
+function applySkin(name){
+  skinName = name;
+  const gym = name === 'gym';
+  const ss = $('#skinSwitch');
+  if(ss){ ss.dataset.skin = name; $$('#skinSwitch button').forEach(b => b.classList.toggle('on', b.dataset.skin === name)); }
+  const K = skinKit(name);
+  dressed = true;
+  currentSkin = gym ? (SKIN_COLORS.gym_skin || '#e3e2e9') : (SKIN_COLORS.camp_skin || '#F5CD30');
+  partMeshes.torso.material = K.torso;
+  partMeshes.armL.material  = K.arm;
+  partMeshes.armR.material  = K.arm;
+  partMeshes.legL.material     = K.legs.L.thigh;
+  partMeshes.legR.material     = K.legs.R.thigh;
+  partMeshes.legLShin.material = K.legs.L.shin;
+  partMeshes.legRShin.material = K.legs.R.shin;
+  head.material = headMats(K);
+  shoeL.material = K.shoeL;
+  shoeR.material = K.shoeR;
+  if(gym){
+    cap.visible = true;  capOn = true;
+    nyPatch.visible = true;
+    bandana.visible = false;
+    campHood.visible = false;
+    gymHair.visible = false;
+    gymShades.visible = false;            /* лицо всегда открыто */
+    gymChain.visible = false;             /* цепь с крестом уже в текстуре тела */
+    campHair.visible = campPhones.visible = false;
+    gymGloves.forEach(m => m.visible = true);
+    if(gymHair.children) gymHair.children.forEach(m => m.material = K.hairMat);
+  } else {
+    cap.visible = false;
+    campHood.visible = true;
+    gymHair.visible = false;
+    gymShades.visible = false;
+    nyPatch.visible = false; bandana.visible = false;
+    gymChain.visible = false;             /* не перекрываем принт на груди */
+    campHair.visible = campPhones.visible = true;
+    gymGloves.forEach(m => m.visible = false);
+    if(campHair.children) campHair.children.forEach(m => m.material = K.hairMat);
+  }
+  applyFace();
+  updateSwatches();
+}
+
+function setMuted(v){
+  muted = v;
+  applyVolume();
+  setBrand(musicMode && !muted);
+}
+function setMode(m, first){
+  if(mode === m && !first) return;
+  const night = m === 'night';
+  mode = m;
+  nightMode = night;
+  musicMode = !night;
+  const ms = $('#modeSwitch');
+  if(ms) ms.dataset.mode = m;
+  $$('#modeSwitch button').forEach(b => b.classList.toggle('on', b.dataset.mode === m));
+  setBrand(musicMode && !muted);
+  faceMode = night ? 'smile' : 'smirk';
+  applySkin(skinName);
+  applyFace();
+  audioEl.src = night ? 'old-song.m4a' : 'track.mp3';
+  audioEl.loop = true;
+  audioEl.load();
+  applyVolume();
+  resetBeats();
+  if(entered){
+    if(!muted && masterVol > 0) audioEl.play().catch(()=>{});
+    if(!night && !dressed) suitUp();
+    if(current === 0) flyTo(camViews[night ? 'night' : 'home'], 1.7);
+  }
+}
+$('#soundBtn').addEventListener('click', ()=> setMuted(!muted));
+$('#dockMute').addEventListener('click', ()=> setMuted(!muted));
+$('#vol').addEventListener('input', e => {
+  masterVol = +e.target.value;
+  storeSet('rbxVol', masterVol);
+  if(masterVol > 0 && muted) muted = false;
+  applyVolume();
+  setBrand(musicMode && !muted);
+});
+$$('#modeSwitch button').forEach(b => b.addEventListener('click', ()=> setMode(b.dataset.mode)));
+$$('#skinSwitch button').forEach(b => b.addEventListener('click', ()=> applySkin(b.dataset.skin)));
+
+/* ================= textures ================= */
+function studTexture(){
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ececec'; g.fillRect(0,0,64,64);
+  g.strokeStyle = 'rgba(0,0,0,.10)'; g.lineWidth = 2; g.strokeRect(1,1,62,62);
+  g.fillStyle = 'rgba(0,0,0,.16)'; g.beginPath(); g.arc(34,36,13,0,7); g.fill();
+  const rg = g.createRadialGradient(29,27,2,31,30,14);
+  rg.addColorStop(0,'#ffffff'); rg.addColorStop(1,'#b9b9b9');
+  g.fillStyle = rg; g.beginPath(); g.arc(31,30,13,0,7); g.fill();
+  const tx = new THREE.CanvasTexture(c);
+  tx.colorSpace = THREE.SRGBColorSpace;
+  return tx;
+}
+/* ---------- ЖИВОЕ ЛИЦО ----------
+   Лицо рисуется на канвасе заново, когда меняется мимика: брови, веки, взгляд, улыбка.
+   Так персонаж ухмыляется, щурится под бас и моргает — тело при этом не трогаем. */
+const SKIN_FACE = '#F5CD30';
+let currentSkin = SKIN_FACE;
+
+const faceState = {
+  brow: 0,      // -1 опущены .. +1 подняты
+  sad: 0,       // внутренние концы бровей вверх (грусть)
+  eye: 1,       // открытость 0..1
+  squint: 0,    // прищур под бас
+  look: 0,      // -1..1 куда смотрит
+  smile: 0,     // -1 грусть .. 0 серьёзно .. 1 широкая улыбка
+  smirk: .55,   // уверенная ухмылка (асимметрия рта)
+  tongue: 0     // 0..1 высунутый язык
+};
+let faceDirty = true;
+
+const faceCanvas = document.createElement('canvas');
+faceCanvas.width = faceCanvas.height = 256;
+const fg = faceCanvas.getContext('2d');
+const faceTex = new THREE.CanvasTexture(faceCanvas);
+faceTex.colorSpace = THREE.SRGBColorSpace;
+faceTex.anisotropy = 8;
+
+function drawFace(){
+  const g = fg, s = faceState, ink = '#141414';
+  g.globalCompositeOperation = 'source-over';
+  g.fillStyle = currentSkin; g.fillRect(0,0,256,256);
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  const open = Math.max(0, Math.min(1, s.eye))*(1 - Math.min(.92, s.squint));
+  const lx = s.look*26;
+  for(let i=0;i<2;i++){
+    const side = i?1:-1, cx = 128 + side*44, cy = 116, w = 58, hh = 30, r = hh/2;
+    if(open > .06){
+      g.save(); g.beginPath(); g.ellipse(cx,cy,w/2,r,0,0,Math.PI*2); g.clip();
+      g.fillStyle = ink; g.fillRect(cx-w, cy-hh, w*2, hh*2);
+      g.fillStyle = 'rgba(255,255,255,.95)';
+      g.beginPath(); g.arc(cx + 8 + lx*.5, cy - 2, 5.5, 0, Math.PI*2); g.fill();
+      const lt = cy - r, ly = lt + hh*(1-open);
+      g.fillStyle = currentSkin; g.fillRect(cx-w, lt-8, w*2, Math.max(0, ly-lt+8));
+      g.restore();
+      g.strokeStyle = ink; g.lineWidth = 7; g.beginPath();
+      g.moveTo(cx-w/2+2, cy-r+hh*(1-open));
+      g.quadraticCurveTo(cx, cy-r+hh*(1-open)-5, cx+w/2-2, cy-r+hh*(1-open)); g.stroke();
+      g.lineWidth = 4; g.beginPath();
+      g.moveTo(cx-w/2+6, cy+r-1); g.quadraticCurveTo(cx, cy+r+6, cx+w/2-6, cy+r-1); g.stroke();
+    } else {
+      g.strokeStyle = ink; g.lineWidth = 7; g.beginPath();
+      g.moveTo(cx-25, cy+1); g.quadraticCurveTo(cx, cy+13, cx+25, cy+1); g.stroke();
+    }
+    const by = 78 - s.brow*12, inner = cx - side*27, outer = cx + side*28;
+    g.strokeStyle = ink; g.lineWidth = 15; g.beginPath();
+    g.moveTo(inner, by - s.sad*13 + s.brow*2 + 5);
+    g.quadraticCurveTo((inner+outer)/2, by-9-s.brow*3, outer, by + s.brow*4 + s.sad*4 - 6);
+    g.stroke();
+  }
+  const mY = 196, half = 58 + s.smile*16;
+  const up = 14 + s.smile*10 + s.smirk*14, up2 = 14 + s.smile*10 - s.smirk*14;
+  g.strokeStyle = ink; g.lineWidth = 12; g.beginPath();
+  g.moveTo(128-half, mY-up); g.quadraticCurveTo(128, mY+22+s.smile*26, 128+half, mY-up2); g.stroke();
+  if(s.tongue > .02){
+    g.fillStyle = '#e0566a'; g.beginPath();
+    g.ellipse(128+6, mY + (22+s.smile*26)*.5, 16, 24*s.tongue, 0, 0, Math.PI*2); g.fill();
+  }
+  faceTex.needsUpdate = true;
+}
+function applyFace(){ drawFace(); }
+
+/* лица — готовая графика из референса, ничего не перерисовываем */
+const FACE_ART = { smirk: 'data:image/png;base64,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', smile: 'data:image/png;base64,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' };
+const faceArtImgs = {};
+function loadArtFace(key){
+  const im = new Image();
+  im.onload = () => { faceArtImgs[key] = im; drawFace(); };
+  im.src = FACE_ART[key];
+  if(im.complete && im.naturalWidth) faceArtImgs[key] = im;
+}
+loadArtFace('smirk'); loadArtFace('smile');
+
+/* ================= МИМИКА =================
+   Днём — ухмылка, прищур под бас, короткие брови, редкая широкая улыбка и язык.
+   Ночью — уставшее грустное лицо с медленными морганиями и взглядом в сторону.
+   Тело и танец не трогаем вообще. */
+let fSquint = 0, fBrow = 0, fWide = 0, fTongue = 0, fBlinkT = 0, fBlinkWait = 0, fNextBlink = 2.2;
+let fHitN = 0, fLook = 0, fLookTarget = 0, fLookWait = 0, fNightT = 0;
+
+function faceOnBeat(accent){
+  fHitN++;
+  fSquint = Math.min(1, .35 + accent*.65);
+  fBrow   = Math.min(1, .45 + accent*.55);
+  if(fHitN % 8 === 0) fWide = 1;                 // широко улыбается на акцентах
+  if(fHitN % 3 === 0) fLookTarget = (Math.random()-.5)*1.1;   // «дерзкий» взгляд в сторону
+  if(Math.random() < .05) fTongue = 1;           // изредка показывает язык
+}
+
+let nfT = 0, nfBlink = 0, nfNext = 3, nfLook = 0;
+const EXPR = [
+  { sad:.85, brow:-.35, eye:.45, smile:-.22, smirk:0  },   // грусть
+  { sad:1,   brow:-.5,  eye:.35, smile:-.35, smirk:0  },   // тоска
+  { sad:.55, brow:.05,  eye:.6,  smile:.05,  smirk:.15},   // задумчивость
+  { sad:.45, brow:-.2,  eye:.28, smile:-.1,  smirk:0  },   // усталость
+  { sad:.2,  brow:.25,  eye:.75, smile:.45,  smirk:.25}    // лёгкая улыбка
+];
+let exprI = 0, exprT = 0;
+function updateFace(dt, t){
+  const s = faceState;
+  if(nightMode){
+    nfT += dt; exprT += dt;
+    if(exprT > 7 + (exprI%3)*2){ exprT = 0; exprI = (exprI + 1 + (Math.random()*4|0)) % EXPR.length; }
+    const e = EXPR[exprI];
+    s.sad = e.sad; s.brow = e.brow; s.smile = e.smile; s.smirk = e.smirk; s.tongue = 0;
+    nfLook += (Math.sin(nfT*.18)*.5 - nfLook)*Math.min(1, dt*1.5);
+    s.look = nfLook;
+    s.squint = .18;
+    /* медленные моргания, иногда закрывает глаза и держит */
+    nfBlink += dt;
+    if(nfBlink > nfNext){
+      const close = .18 + Math.random()*.1;
+      s.eye = 0;
+      if(nfBlink > nfNext + close){ nfBlink = 0; nfNext = 2.6 + Math.random()*3.8; }
+    } else {
+      s.eye = e.eye;
+    }
+  } else {
+    /* днём — фонк-мимика (как было) */
+    fSquint *= Math.exp(-dt*8); fBrow *= Math.exp(-dt*9); fWide *= Math.exp(-dt*2.4);
+    fTongue = Math.max(0, fTongue - dt*1.8);
+    s.sad = 0; s.brow = -.06 + fBrow*.85; s.squint = .1 + fSquint*.5;
+    s.smile = .12 + fWide*.75; s.smirk = .6 - fWide*.32; s.look = fLook; s.tongue = fTongue;
+    fBlinkWait += dt;
+    if(fBlinkT > 0){ fBlinkT -= dt; s.eye = 1 - Math.sin(Math.max(0,fBlinkT)/.15*Math.PI); }
+    else { s.eye = 1; if(fBlinkWait > fNextBlink){ fBlinkT = .15; fBlinkWait = 0; fNextBlink = 1.8 + Math.random()*3.2; } }
+  }
+  const sig = [s.brow,s.sad,s.eye,s.squint,s.look,s.smile,s.smirk,s.tongue].map(v=>Math.round(v*45)).join(',');
+  if(sig !== updateFace.sig){ updateFace.sig = sig; drawFace(); }
+}
+updateFace.sig = '';
+
+/* fabric texture for the tracksuit: zipper+collar, 3 stripes, 1 stripe */
+function stripeTex(bg, kind){
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = bg; g.fillRect(0,0,128,128);
+  g.fillStyle = '#ffffff';
+  if(kind === 'zipper'){
+    g.fillRect(61,0,6,128);
+    /* бегунок молнии */
+    g.fillRect(58,6,12,10);
+    g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = 3; g.lineCap = 'round';
+    g.beginPath(); g.moveTo(44,8);  g.lineTo(60,20); g.stroke();
+    g.beginPath(); g.moveTo(84,8);  g.lineTo(68,20); g.stroke();
+  }else if(kind === 'three'){
+    [48,64,80].forEach(x => g.fillRect(x-4,0,8,128));
+  }else{ /* one */
+    g.fillRect(59,0,10,128);
+  }
+  const tx = new THREE.CanvasTexture(c);
+  tx.colorSpace = THREE.SRGBColorSpace;
+  return tx;
+}
+function dotTexture(){
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const rg = g.createRadialGradient(32,32,0,32,32,32);
+  rg.addColorStop(0,'rgba(255,255,255,1)');
+  rg.addColorStop(.4,'rgba(255,255,255,.45)');
+  rg.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle = rg; g.fillRect(0,0,64,64);
+  return new THREE.CanvasTexture(c);
+}
+function glowTexture(color){
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const rg = g.createRadialGradient(128,128,0,128,128,128);
+  rg.addColorStop(0, color);
+  rg.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = rg; g.fillRect(0,0,256,256);
+  return new THREE.CanvasTexture(c);
+}
+
+/* ================= renderer / scene ================= */
+const canvas = $('#scene');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x070810);
+scene.fog = new THREE.FogExp2(0x070810, .028);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, .1, 120);
+
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), .55, .65, .82);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+/* lights */
+const ambient = new THREE.AmbientLight(0xbfd4ff, .55);
+scene.add(ambient);
+const DAY_KEY = new THREE.Color(0xfff2df), NIGHT_KEY = new THREE.Color(0x7d97d8);
+const key = new THREE.DirectionalLight(0xfff2df, 2.4);
+key.position.set(6, 10, 5);
+key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024);
+key.shadow.camera.left = key.shadow.camera.bottom = -9;
+key.shadow.camera.right = key.shadow.camera.top = 9;
+scene.add(key);
+const redLight  = new THREE.PointLight(0xff2b3d, 26, 22, 2); redLight.position.set(-7, 3, 3);  scene.add(redLight);
+const cyanLight = new THREE.PointLight(0x39e6ff, 22, 22, 2); cyanLight.position.set(7, 4, -3); scene.add(cyanLight);
+/* холодный контровой свет — отделяет силуэт от фона */
+const rimLight = new THREE.DirectionalLight(0x9ec8ff, 1.5);
+rimLight.position.set(-6, 8, -8);
+scene.add(rimLight);
+/* лунный прожектор на персонажа — ночью он читается, а остров остаётся тёмным */
+const moonSpot = new THREE.SpotLight(0xa8c0ff, 0, 26, .4, .65, 1.3);
+moonSpot.position.set(3.4, 6.4, 6.6);
+moonSpot.target.position.set(0, 1.2, 1.3);
+scene.add(moonSpot); scene.add(moonSpot.target);
+
+/* shadow catcher */
+const shadowPlane = new THREE.Mesh(
+  new THREE.PlaneGeometry(60, 60),
+  new THREE.ShadowMaterial({opacity:.22})
+);
+shadowPlane.rotation.x = -Math.PI/2;
+shadowPlane.position.y = -3.4;
+shadowPlane.receiveShadow = true;
+scene.add(shadowPlane);
+
+/* ================= island ================= */
+const stud = studTexture();
+const boxGeo = new THREE.BoxGeometry(1,1,1);
+function mats(color){
+  const side = new THREE.MeshStandardMaterial({color, roughness:.85});
+  const top  = new THREE.MeshStandardMaterial({color, roughness:.85, map:stud});
+  return [side, side, top, side, side, side];
+}
+const grassMats = mats(0x59c14b);
+const dirtMats  = mats(0x8a5a33);
+
+const island = new THREE.Group();
+scene.add(island);
+const blocks = [];
+function addBlock(x, y, z, kind){
+  const m = new THREE.Mesh(boxGeo, kind === 'grass' ? grassMats : dirtMats);
+  m.position.set(x, y, z);
+  m.castShadow = m.receiveShadow = true;
+  island.add(m);
+  blocks.push({m, delay: Math.hypot(x, z)/6});
+}
+for(let x=-3; x<=3; x++) for(let z=-3; z<=3; z++){
+  const d = x*x + z*z;
+  if(d > 12.5 || (Math.random() < .12 && d > 9)) continue;   // больше остров, ядро без дырок
+  addBlock(x, 0, z, 'grass');
+  const depth = d > 6 ? 3 : d > 3 ? 2 : (Math.random() < .5 ? 2 : 1);
+  for(let i=1; i<=depth; i++) addBlock(x, -i, z, 'dirt');
+}
+
+/* ================= avatar ================= */
+const BRICK = {
+  skin:  ['#F5CD30','#FFC5D0','#E0A060','#F2F3F3','#FFB56B'],
+  any:   ['#C4281C','#0D69AC','#4B974B','#DA8541','#F5CD30','#E8BAC8','#635F62','#00A2FF','#F2F3F3']
+};
+const pick = a => a[Math.floor(Math.random()*a.length)];
+
+const avatar = new THREE.Group();
+avatar.position.set(0, .5, 1.3);
+scene.add(avatar);
+
+const partMats = {};
+const partMeshes = {};
+function part(name, w, h, d, color, x, y, z, parent=avatar){
+  const mat = new THREE.MeshStandardMaterial({color, roughness:.62});
+  const m = new THREE.Mesh(boxGeo, mat);
+  m.scale.set(w, h, d);
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  parent.add(m);
+  partMats[name] = mat;
+  partMeshes[name] = m;
+  return m;
+}
+/* legs — бедро и голень на шарнирах, чтобы персонаж мог нормально сесть */
+function legGroup(side){
+  const name = side < 0 ? 'legL' : 'legR';
+  const mat = new THREE.MeshStandardMaterial({color:'#4B974B', roughness:.62});
+  const g = new THREE.Group();                 // шарнир в бедре
+  g.position.set(side*.28, 1.0, 0);
+  const thigh = new THREE.Mesh(boxGeo, mat);
+  thigh.scale.set(.48, .5, .5);
+  thigh.position.y = -.25;
+  thigh.castShadow = true;
+  g.add(thigh);
+  const knee = new THREE.Group();              // шарнир в колене
+  knee.position.y = -.5;
+  const shin = new THREE.Mesh(boxGeo, mat);
+  shin.scale.set(.48, .5, .5);
+  shin.position.y = -.25;
+  shin.castShadow = true;
+  knee.add(shin);
+  g.add(knee);
+  avatar.add(g);
+  partMats[name] = mat;
+  partMeshes[name] = thigh;
+  partMeshes[name + 'Shin'] = shin;
+  g.userData.knee = knee;
+  return g;
+}
+const legL = legGroup(-1), legR = legGroup(1);
+/* torso */
+part('torso', 1.1, 1.0, .58, '#0D69AC', 0, 1.5, 0);
+/* arms with shoulder pivots */
+function arm(side){
+  const g = new THREE.Group();
+  g.position.set(side*.83, 1.95, 0);
+  const m = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({color:'#F5CD30', roughness:.62}));
+  m.scale.set(.42, 1.05, .5);
+  m.position.y = -.45;
+  m.castShadow = true;
+  g.add(m);
+  avatar.add(g);
+  partMats[side<0?'armL':'armR'] = m.material;
+  partMeshes[side<0?'armL':'armR'] = m;
+  return g;
+}
+const armL = arm(-1), armR = arm(1);
+/* head with face */
+const headSide = new THREE.MeshStandardMaterial({color:'#F5CD30', roughness:.55});
+const headFace = new THREE.MeshStandardMaterial({color:'#ffffff', roughness:.55});   // белый: цвет лица уже в текстуре
+const head = new THREE.Mesh(boxGeo, [headSide,headSide,headSide,headSide,headFace,headSide]);
+head.scale.set(.85,.85,.85);
+head.castShadow = true;
+head.position.y = .54;
+/* шея: голова вращается вокруг основания (а не вокруг центра) — кивок читается как живой */
+const neck = new THREE.Group();
+neck.position.y = 1.9;
+neck.add(head);
+avatar.add(neck);
+partMats.head = headSide;
+
+/* face mode: 'smile' = дефолт (фото 2), 'smirk' = включается с музыкой (фото 1) */
+let faceMode = 'smile';
+headFace.map = faceTex;
+headFace.needsUpdate = true;
+applyFace();
+
+const swatchEls = $$('#swatches i');
+function updateSwatches(){
+  const skinCol = currentSkin || '#F5CD30';
+  const cols = dressed
+    ? (skinName === 'gym' ? ['#e9e9f0', '#15151b', skinCol, '#0f0f13']
+                          : ['#121216', '#101014', skinCol, '#e9ecf2'])
+    : [partMats.torso.color.getStyle(), partMats.legL.color.getStyle(),
+       partMats.armL.color.getStyle(), partMats.head.color.getStyle()];
+  swatchEls.forEach((el,i)=> el.style.background = cols[i]);
+}
+/* ---- adidas tracksuit: jacket with zipper + 3 stripes on sleeves, pants with a stripe ---- */
+const FITS = [
+  {j:'#141414', p:'#141414'},   // all black
+  {j:'#232b38', p:'#141414'},   // navy
+  {j:'#5e1f28', p:'#1c1c1c'},   // maroon
+  {j:'#24402b', p:'#141414'},   // dark green
+  {j:'#3a3f45', p:'#23272c'},   // grey
+  {j:'#8a2429', p:'#141414'}    // red
+];
+let lastFit = {j:'#141414', p:'#141414'};
+function dressUp(){
+  /* костюм = текстуры пака (см. build_textures.py) */
+  applySkin('camp');
+}
+
+/* ---- black cap, worn backwards ---- */
+const cap = new THREE.Group();
+{
+  const cm = new THREE.MeshStandardMaterial({color:0x121212, roughness:.55});
+  const domeM = new THREE.Mesh(boxGeo, cm);
+  domeM.scale.set(1.04,.34,1.04); domeM.position.y = .56;
+  const brimM = new THREE.Mesh(boxGeo, cm);
+  brimM.scale.set(.94,.09,.5); brimM.position.set(0,.5,-.7);
+  const badge = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({color:0xff2b3d, roughness:.4}));
+  badge.scale.set(.18,.05,.18); badge.position.y = .74;
+  cap.add(domeM, brimM, badge);
+}
+/* ---- аксессуары скина «КАЧ» ---- */
+const gymBlack = new THREE.MeshStandardMaterial({color:0x0f0f13, roughness:.7});
+const nyPatch = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({color:0xe9ecf2, roughness:.5}));
+nyPatch.scale.set(.26,.16,.04); nyPatch.position.set(0,.5,-.52); nyPatch.visible = false;
+cap.add(nyPatch);
+const bandana = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({color:0x1a1a1f, roughness:.85}));
+bandana.scale.set(.9,.34,.06); bandana.position.set(0,-.16,.5); bandana.visible = false;
+head.add(bandana);
+const gymHair = new THREE.Group();
+[[0,.52,0,1.06,.22,1.06],[-.3,.64,.02,.5,.3,.5],[.3,.66,-.04,.44,.34,.44],[0,.7,.16,.32,.26,.32]]
+  .forEach(([x,y,z,w,hh,d])=>{ const m=new THREE.Mesh(boxGeo,gymBlack); m.scale.set(w,hh,d); m.position.set(x,y,z); m.castShadow=true; gymHair.add(m); });
+gymHair.visible = false;
+head.add(gymHair);
+const gymShades = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({color:0x0a0a0c, roughness:.25, metalness:.3}));
+gymShades.scale.set(.96,.19,.06); gymShades.position.set(0,.1,.51); gymShades.visible = false;
+head.add(gymShades);
+const gymChain = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({color:0xdfe3ea, metalness:.85, roughness:.22}));
+gymChain.scale.set(.44,.07,.05); gymChain.position.set(0,2.12,.31); gymChain.visible = false;
+avatar.add(gymChain);
+const gymGloves = [];
+[-1,1].forEach(sd => {
+  const m = new THREE.Mesh(boxGeo, gymBlack);
+  m.scale.set(.44,.3,.52); m.position.set(0,-.95,0); m.visible = false;
+  (sd<0 ? armL : armR).add(m); gymGloves.push(m);
+});
+
+/* ---- худи со звездой ---- */
+function starTex(){
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = '#0d0d10'; g.fillRect(0,0,128,128);
+  g.strokeStyle = '#e9ecf2'; g.lineWidth = 5; g.lineJoin = 'round';
+  g.beginPath();
+  for(let i=0;i<10;i++){
+    const r = i%2 ? 22 : 52, a = -Math.PI/2 + i*Math.PI/5;
+    const x = 64 + Math.cos(a)*r, y = 66 + Math.sin(a)*r;
+    i ? g.lineTo(x,y) : g.moveTo(x,y);
+  }
+  g.closePath(); g.stroke();
+  const tx = new THREE.CanvasTexture(c);
+  tx.colorSpace = THREE.SRGBColorSpace;
+  return tx;
+}
+const hoodieTex = new THREE.MeshStandardMaterial({map:starTex(), roughness:.75});
+const campHood = new THREE.Mesh(boxGeo, gymBlack);
+campHood.scale.set(1.25,.5,.7); campHood.position.set(0,2.18,-.16); campHood.visible = false;
+avatar.add(campHood);
+
+/* ---- аксессуары скина «КОСТЁР» ---- */
+const campHair = new THREE.Group();
+[[0,.52,0,1.08,.24,1.06],[-.3,.63,.03,.5,.32,.5],[.31,.65,-.05,.46,.34,.46],[0,.72,.14,.34,.3,.34],[-.05,.6,-.3,.7,.26,.4]]
+  .forEach(([x,y,z,w,hh,d])=>{ const m=new THREE.Mesh(boxGeo, gymBlack); m.scale.set(w,hh,d); m.position.set(x,y,z); m.castShadow=true; campHair.add(m); });
+campHair.visible = false; head.add(campHair);
+const campPhones = new THREE.Group();
+[-1,1].forEach(sd => {
+  const cup = new THREE.Mesh(boxGeo, gymBlack);
+  cup.scale.set(.16,.34,.42); cup.position.set(sd*.47,.02,0); campPhones.add(cup);
+});
+const band = new THREE.Mesh(boxGeo, gymBlack);
+band.scale.set(1.0,.12,.12); band.position.set(0,.44,0); campPhones.add(band);
+campPhones.visible = false; head.add(campPhones);
+
+cap.position.y = 3;   // ждёт над головой и падает, когда начинается трек
+head.add(cap);
+let capOn = true;
+function capDrop(){
+  cap.visible = true; capOn = true;
+  $('#capBtn').textContent = '🧢 Кепка: надета';
+  cap.position.y = 3;
+  animate({dur:650, update:e => { cap.position.y = 3*(1-e); }, done: ()=>{
+    animate({dur:320, ease:linear, update:(e,k)=>{ cap.position.y = .18*Math.sin(k*Math.PI); }});
+  }});
+}
+
+/* white sneakers (появятся вместе с костюмом) */
+const shoeMat = new THREE.MeshStandardMaterial({color:0xf2f3f3, roughness:.5});
+const shoeL = new THREE.Mesh(boxGeo, shoeMat);
+shoeL.scale.set(.5,.32,.55); shoeL.position.set(0,-.36,.01); shoeL.castShadow = true;
+const shoeR = shoeL.clone();
+partMeshes.legLShin.parent.add(shoeL);
+partMeshes.legRShin.parent.add(shoeR);
+shoeL.visible = shoeR.visible = false;
+
+
+
+/* ================= костёр и бревно (ночной режим) ================= */
+const fireGroup = new THREE.Group();
+fireGroup.position.set(2, .5, 2);
+fireGroup.visible = false;
+scene.add(fireGroup);
+
+const woodMat  = new THREE.MeshStandardMaterial({color:0x3a2317, roughness:.95});
+const stoneMat = new THREE.MeshStandardMaterial({color:0x4a4a55, roughness:.9});
+for(let i=0;i<4;i++){
+  const log = new THREE.Mesh(boxGeo, woodMat);
+  log.scale.set(1.25,.2,.2);
+  log.position.y = .1 + i*.05;
+  log.rotation.y = i*Math.PI/4 + .25;
+  log.rotation.z = (i%2 ? .1 : -.1);
+  log.castShadow = log.receiveShadow = true;
+  fireGroup.add(log);
+}
+for(let i=0;i<7;i++){
+  const st = new THREE.Mesh(boxGeo, stoneMat);
+  const a = i/7*Math.PI*2;
+  st.scale.set(.24,.18,.24);
+  st.position.set(Math.cos(a)*1.02, .09, Math.sin(a)*1.02);
+  st.rotation.y = a*1.7;
+  st.castShadow = true;
+  fireGroup.add(st);
+}
+const flameTexA = glowTexture('rgba(255,190,90,.95)');
+const flameTexB = glowTexture('rgba(255,110,30,.95)');
+const flames = [];
+for(let i=0;i<5;i++){
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: i%2 ? flameTexB : flameTexA, transparent:true, opacity:0,
+    depthWrite:false, blending:THREE.AdditiveBlending
+  }));
+  sp.position.set((Math.random()-.5)*.28, .42, (Math.random()-.5)*.28);
+  sp.userData = {base:.4+Math.random()*.24, phase:Math.random()*6.28, sp:1.2+Math.random()*1.6};
+  fireGroup.add(sp);
+  flames.push(sp);
+}
+const embers = [];
+for(let i=0;i<10;i++){
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: flameTexA, transparent:true, opacity:0, depthWrite:false, blending:THREE.AdditiveBlending
+  }));
+  sp.scale.setScalar(.1);
+  sp.userData = {phase: Math.random()*2.4, speed:.45+Math.random()*.5, x:(Math.random()-.5)*.6, z:(Math.random()-.5)*.6};
+  fireGroup.add(sp);
+  embers.push(sp);
+}
+const fireLight = new THREE.PointLight(0xff8a2a, 0, 11, 2);
+fireLight.position.set(0, 1.0, 0);
+fireGroup.add(fireLight);
+/* тёплый отсвет костра на персонаже */
+const fireFill = new THREE.PointLight(0xff9a4a, 0, 9, 2);
+fireFill.position.set(.7, 1.7, 1.9);
+scene.add(fireFill);
+
+/* бревно, на котором сидит персонаж у костра */
+const bench = new THREE.Mesh(boxGeo, woodMat);
+bench.scale.set(2.6,.5,.74);
+bench.position.set(0, .75, 1.05);
+bench.rotation.y = .05;
+bench.castShadow = bench.receiveShadow = true;
+bench.visible = false;
+scene.add(bench);
+
+/* начальное состояние: обычный классический персонаж, БЕЗ кепки и костюма */
+let dressed = false;
+cap.visible = false;
+updateSwatches();
+
+let waving = false;
+function wave(){
+  waving = true;
+  setTimeout(()=> waving = false, 2800);
+}
+function popParts(){
+  avatar.children.forEach(c => { c.userData.base ??= c.scale.clone(); });
+  avatar.children.forEach((c,i)=>{
+    animate({dur:480, delay:i*55, ease:linear, update:(e,k)=>{
+      const s = 1 + .3*Math.sin(k*Math.PI);
+      c.scale.copy(c.userData.base).multiplyScalar(s);
+    }});
+  });
+}
+function randomizeOutfit(){
+  if(dressed || entered){
+    applySkin(skinName === 'camp' ? 'gym' : 'camp');
+    capOn = Math.random() < .5;
+    cap.visible = capOn;
+    $('#capBtn').textContent = capOn ? '🧢 Кепка: надета' : '🧢 Кепка: снята';
+  }else{
+    currentSkin = pick(BRICK.skin);    // случайный классический образ
+    partMats.head.color.set(currentSkin);
+    partMats.armL.color.set(currentSkin);
+    partMats.armR.color.set(currentSkin);
+    partMats.torso.color.set(pick(BRICK.any));
+    partMats.legL.color.set(pick(BRICK.any));
+    partMats.legR.color.set(pick(BRICK.any));
+    applyFace();
+  }
+  updateSwatches();
+  popParts();
+  wave();
+}
+$('#randomBtn').addEventListener('click', randomizeOutfit);
+
+/* cap on/off */
+$('#capBtn').addEventListener('click', e=>{
+  capOn = !capOn;
+  cap.visible = capOn;
+  e.currentTarget.textContent = capOn ? '🧢 Кепка: надета' : '🧢 Кепка: снята';
+});
+
+/* ================= decorations ================= */
+const floaters = []; // {obj, base, speed, phase, spin}
+
+function deco(o, spin){ floaters.push({o, base:o.position.clone(), speed:.5+Math.random()*.8, phase:Math.random()*7, spin}); scene.add(o); }
+
+/* neon rings — shader with flowing energy, pulses to the beat */
+function ringMaterial(colorHex, opacity){
+  const c = new THREE.Color(colorHex);
+  return new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    uniforms: {
+      uTime:  { value: 0 },
+      uKick:  { value: 0 },
+      uAlpha: { value: opacity },
+      uColor: { value: new THREE.Vector3(c.r, c.g, c.b) }
+    },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+    fragmentShader: `
+      varying vec2 vUv; uniform float uTime, uKick, uAlpha; uniform vec3 uColor;
+      void main(){
+        float flow = .5 + .5*sin((vUv.x*8.0 + uTime*1.7)*6.28318);
+        float a = uAlpha*(.5 + flow*.5) + uKick*.5;
+        vec3 col = uColor*(1.1 + flow*1.7 + uKick*2.2);
+        gl_FragColor = vec4(col, a);
+      }`
+  });
+}
+const ringRedMat  = ringMaterial(0xff2b3d, .9);
+const ringCyanMat = ringMaterial(0x39e6ff, .55);
+const ringRed = new THREE.Mesh(new THREE.TorusGeometry(3.9,.03,12,120), ringRedMat);
+ringRed.rotation.x = Math.PI/2; ringRed.position.y = -2.7; deco(ringRed);
+const ringCyan = new THREE.Mesh(new THREE.TorusGeometry(4.7,.022,12,120), ringCyanMat);
+ringCyan.rotation.x = Math.PI/2; ringCyan.position.y = -3.0; deco(ringCyan);
+
+/* neon wireframe cubes */
+const wire = (color, size) => new THREE.LineSegments(
+  new THREE.EdgesGeometry(new THREE.BoxGeometry(size,size,size)),
+  new THREE.LineBasicMaterial({color, transparent:true, opacity:.9})
+);
+[[-3.4,3.8,-1.4,0x39e6ff,.9],[3.2,1.2,2.2,0xff2b3d,.7],[-2.6,.9,3.4,0x39e6ff,.55],[4.4,4.6,-1.8,0xff2b3d,1.0],[1.6,5.2,.4,0xffffff,.5]]
+.forEach(([x,y,z,c,s])=>{ const w = wire(c,s); w.position.set(x,y,z); deco(w, new THREE.Vector3(.3+Math.random()*.4,.4+Math.random()*.5,0)); });
+
+/* 3D Roblox-style logo */
+const logo = new THREE.Group();
+{
+  const m = new THREE.MeshStandardMaterial({color:0xe2231a, roughness:.35, metalness:.15});
+  const mk = (w,h,d,x,y)=>{ const b = new THREE.Mesh(boxGeo,m); b.scale.set(w,h,d); b.position.set(x,y,0); b.castShadow=true; logo.add(b); };
+  mk(1.7,.5,.35, 0, .6);
+  mk(1.7,.5,.35, 0, -.6);
+  mk(.5,.7,.35, -.6, 0);
+  mk(.5,.7,.35,  .6, 0);
+}
+logo.position.set(3.4, 2.9, -.7);
+logo.rotation.z = -.14;
+logo.scale.setScalar(1.1);
+deco(logo);
+
+/* game cartridges (floating colored cubes) */
+const cartCols = ['#C4281C','#0D69AC','#4B974B','#F5CD30'];
+[[-5.2,1.6,-.6],[-6.2,2.7,-1.4],[-4.8,3.5,-.2],[-5.8,4.4,.4]].forEach(([x,y,z],i)=>{
+  const m = new THREE.Mesh(boxGeo, mats(cartCols[i]));
+  m.scale.setScalar(.6 + Math.random()*.18);
+  m.position.set(x,y,z);
+  m.castShadow = true;
+  m.add(new THREE.LineSegments(new THREE.EdgesGeometry(boxGeo), new THREE.LineBasicMaterial({color:0xffffff, transparent:true, opacity:.3})));
+  deco(m, new THREE.Vector3(.4,.55,.3));
+});
+
+/* mini floating islands with trees */
+function miniIsland(x,y,z){
+  const g = new THREE.Group();
+  const cells = [[0,0],[-1,0],[1,0],[0,-1],[0,1]];
+  cells.forEach(([cx,cz],i)=>{
+    const b = new THREE.Mesh(boxGeo, grassMats);
+    b.position.set(cx*.95, 0, cz*.95);
+    b.castShadow = b.receiveShadow = true;
+    g.add(b);
+    if(i<3){ const d = new THREE.Mesh(boxGeo, dirtMats); d.position.set(cx*.95,-.95,cz*.95); d.castShadow=true; g.add(d); }
+  });
+  const trunk = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({color:0x6b4a26, roughness:.9}));
+  trunk.scale.set(.32,.85,.32); trunk.position.set(0,1.2,0); trunk.castShadow=true; g.add(trunk);
+  const leaf = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({color:0x3f9e3a, roughness:.85}));
+  leaf.scale.setScalar(1.05); leaf.position.set(0,2.0,0); leaf.castShadow=true; g.add(leaf);
+  const leaf2 = new THREE.Mesh(boxGeo, leaf.material);
+  leaf2.scale.set(.7,.5,.7); leaf2.position.set(0,2.7,0); g.add(leaf2);
+  g.position.set(x,y,z);
+  g.rotation.y = Math.random()*6;
+  deco(g);
+}
+miniIsland(-8.4, 2.6, -5.4);
+miniIsland(8.8, 3.6, -6.0);
+miniIsland(-7.2, 5.4, 3.4);
+
+/* clouds */
+function cloud(x,y,z,s){
+  const g = new THREE.Group();
+  const cm = new THREE.MeshStandardMaterial({color:0xffffff, roughness:1, emissive:0xffffff, emissiveIntensity:.22, transparent:true, opacity:.92});
+  [[0,0,0,1.4,.7,1],[1.1,.1,.2,1,.55,.8],[-1.0,.05,.1,1.1,.6,.9],[.3,.4,-.1,.9,.6,.8]].forEach(([a,b,c,w,h,d])=>{
+    const m = new THREE.Mesh(boxGeo, cm);
+    m.scale.set(w,h,d); m.position.set(a,b,c);
+    g.add(m);
+  });
+  g.scale.setScalar(s);
+  g.position.set(x,y,z);
+  deco(g);
+}
+cloud(-7, 5.6, -4, 1.2);
+cloud(7.5, 6.2, -5, 1.5);
+cloud(2, 7, -8, 1);
+
+/* ================= nebula dome (custom shader background) ================= */
+const domeMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false,
+  uniforms: { uTime: { value: 0 }, uEnergy: { value: 0 }, uNight: { value: 0 } },
+  vertexShader: `varying vec3 vPos; void main(){ vPos = position; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+  fragmentShader: `
+    varying vec3 vPos; uniform float uTime, uEnergy, uNight;
+    void main(){
+      float h = normalize(vPos).y*.5 + .5;
+      vec3 deep = vec3(.014,.017,.04);
+      vec3 top  = vec3(.045,.055,.115);
+      vec3 col = mix(deep, top, pow(h, 1.5));
+      float n = sin(vPos.x*.055 + uTime*.16) * sin(vPos.z*.048 - uTime*.11) * sin(vPos.y*.065 + uTime*.13);
+      col += vec3(.34,.05,.09) * max(n, 0.) * (.22 + uEnergy*.55);
+      col += vec3(.02,.16,.30) * max(-n, 0.) * (.2 + uEnergy*.35);
+      /* ночь: уводим небо в глубокий синий и гасим неон */
+      col = mix(col, vec3(.008,.012,.032), uNight*.92);
+      gl_FragColor = vec4(col, 1.);
+    }`
+});
+const dome = new THREE.Mesh(new THREE.SphereGeometry(70, 48, 32), domeMat);
+scene.add(dome);
+
+/* ================= particles (custom twinkle shader) ================= */
+const pGeo = new THREE.BufferGeometry();
+const pCount = 460;
+const pPos = new Float32Array(pCount*3);
+const pPhase = new Float32Array(pCount);
+for(let i=0;i<pCount;i++){
+  const r = 8 + Math.random()*12, th = Math.random()*Math.PI*2, ph = Math.acos(2*Math.random()-1);
+  pPos[i*3]   = r*Math.sin(ph)*Math.cos(th);
+  pPos[i*3+1] = Math.abs(r*Math.cos(ph))*.7 - 2;
+  pPos[i*3+2] = r*Math.sin(ph)*Math.sin(th);
+  pPhase[i] = Math.random()*6.283;
+}
+pGeo.setAttribute('position', new THREE.BufferAttribute(pPos,3));
+pGeo.setAttribute('aPhase', new THREE.BufferAttribute(pPhase,1));
+const pMat = new THREE.ShaderMaterial({
+  transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  uniforms: { uTime: { value: 0 }, uEnergy: { value: 0 } },
+  vertexShader: `
+    attribute float aPhase; varying float vA;
+    uniform float uTime, uEnergy;
+    void main(){
+      vec4 mv = modelViewMatrix * vec4(position, 1.);
+      float tw = .6 + .4*sin(uTime*2.2 + aPhase);
+      vA = tw * (.5 + uEnergy*.7);
+      gl_PointSize = min((1.0 + tw*.7) * (1.0 + uEnergy*.45) * (34.0 / -mv.z), 16.0);
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    varying float vA;
+    void main(){
+      float d = length(gl_PointCoord - .5);
+      float a = smoothstep(.5, .06, d);
+      gl_FragColor = vec4(vec3(.55,.72,1.)*1.25, a*vA*.85);
+    }`
+});
+const particles = new THREE.Points(pGeo, pMat);
+scene.add(particles);
+
+
+/* ambient glow sprites */
+function glowSprite(color, x, y, z, s, op){
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:glowTexture(color), transparent:true, opacity:op, depthWrite:false, blending:THREE.AdditiveBlending}));
+  sp.scale.setScalar(s); sp.position.set(x,y,z);
+  scene.add(sp); return sp;
+}
+const glowR = glowSprite('rgba(255,43,61,.55)', -9, 2, -7, 14, .35);
+const glowC = glowSprite('rgba(57,230,255,.5)', 9, 3, -9, 15, .3);
+
+/* ================= camera views ================= */
+const camViews = {
+  home:    {pos:new THREE.Vector3(.75, 2.45, 8.2), look:new THREE.Vector3(-1.25, 1.55, .4)},
+  games:   {pos:new THREE.Vector3(.2, 3.3, 9.6),  look:new THREE.Vector3(2.9, 2.0, .3)},
+  avatars: {pos:new THREE.Vector3(2.7, 2.6, 7.3), look:new THREE.Vector3(-.45, 1.85, 1.15)},
+  about:   {pos:new THREE.Vector3(2.4, 3.1, 8.2), look:new THREE.Vector3(-3.2, 2.2, .4)},
+  /* ночь у костра */
+  night:   {pos:new THREE.Vector3(-1.85, 2.2, 7.8), look:new THREE.Vector3(.15, 1.0, 2.0)}
+};
+const camBase   = new THREE.Vector3(0, 7, 24);
+const lookBase  = new THREE.Vector3(0, 2, 0);
+let camTween = null;
+
+function flyTo(view, dur=1.7){
+  camTween = {p0:camBase.clone(), p1:view.pos.clone(), l0:lookBase.clone(), l1:view.look.clone(), t0:performance.now(), dur:dur*1000};
+}
+
+/* pulse ripple through blocks */
+let pulseT0 = -10, pulseAmp = .16;
+function pulse(amp = .16){ pulseT0 = performance.now(); pulseAmp = amp; }
+
+/* ================= UI state ================= */
+const VIEWS = ['home','games','avatars','about'];
+let current = 0, countersDone = false;
+
+function go(i, dur=1.7){
+  i = (i+VIEWS.length) % VIEWS.length;
+  if(i === current && document.body.classList.contains('ready')){ /* allow re-run anyway */ }
+  current = i;
+  const key = VIEWS[i];
+
+  $$('.panel').forEach(p => p.classList.toggle('active', p.dataset.view === key));
+  $$('.menu button').forEach(b => b.classList.toggle('active', b.dataset.view === key));
+  $('#indNum').textContent = '0' + (i+1);
+  $('#indBar').style.width = ((i+1)/4*100) + '%';
+
+  flyTo(nightMode && key === 'home' ? camViews.night : camViews[key], dur);
+  pulse();
+  if(key === 'avatars') wave();
+  if(key === 'about' && !countersDone){
+    countersDone = true;
+    $$('.num').forEach(el=>{
+      const to = +el.dataset.to;
+      animate({dur:1600, delay:400, update:(e)=>{
+        el.textContent = Math.round(to*e).toLocaleString('ru-RU');
+      }});
+    });
+  }
+}
+
+$$('.menu button').forEach((b,i)=> b.addEventListener('click', ()=>go(i)));
+$$('[data-goto]').forEach(b => b.addEventListener('click', ()=>go(+b.dataset.goto)));
+$('#playBtn').addEventListener('click', ()=>{ window.open('https://www.roblox.com','_blank'); });
+
+/* keyboard */
+addEventListener('keydown', e=>{
+  if(e.key === 'ArrowRight') go(current+1);
+  if(e.key === 'ArrowLeft')  go(current-1);
+  if(['1','2','3','4'].includes(e.key)) go(+e.key-1);
+});
+/* swipe */
+let touchX = null;
+addEventListener('touchstart', e=> touchX = e.touches[0].clientX, {passive:true});
+addEventListener('touchend', e=>{
+  if(touchX === null) return;
+  const dx = e.changedTouches[0].clientX - touchX;
+  if(Math.abs(dx) > 50) go(current + (dx < 0 ? 1 : -1));
+  touchX = null;
+}, {passive:true});
+
+/* mouse parallax */
+const mouse = {tx:0, ty:0, x:0, y:0};
+addEventListener('mousemove', e=>{
+  mouse.tx = (e.clientX/innerWidth)*2 - 1;
+  mouse.ty = (e.clientY/innerHeight)*2 - 1;
+});
+const flashEl = $('#flash');
+
+/* ================= loader ================= */
+let progress = 0;
+const iv = setInterval(()=>{
+  progress = Math.min(100, progress + Math.random()*17 + 7);
+  $('#loadBar').style.width = progress+'%';
+  $('#loadPct').textContent = Math.round(progress)+'%';
+  const stage = progress < 30 ? 'загружаем миры…' : progress < 55 ? 'ставим блоки…'
+              : progress < 78 ? 'собираем аватар…' : progress < 96 ? 'разжигаем костёр…' : 'всё готово';
+  $('#loadStatus').textContent = stage;
+  if(progress >= 100){
+    clearInterval(iv);
+    $('#loader').classList.add('can-enter');
+  }
+}, 130);
+
+/* ================= music + audio-reactive engine ================= */
+const audioEl = $('#music');
+audioEl.volume = .5;
+applyVolume();
+let analyser = null, freqArr = null;
+let bass = 0, energy = 0, bassAvg = .02, kick = 0;
+
+/* ---------------- КАРТА УДАРОВ ----------------
+   Времена атак низа (20-110 Гц) вытащены офлайн из стема барабанов этого трека
+   (demucs -> анализ атаки по огибающей). HIT_T — где удар реально начинается,
+   HIT_A — сила удара 0..1: сильная доля качает головой сильнее, слабая мягче.
+   Кив считается от этой карты по времени трека, поэтому он не плывёт от FPS. */
+const HIT_T = [0.825,1.618,2.410,3.202,3.995,4.787,5.579,6.372,7.164,7.956,8.748,9.541,10.333,11.125,11.918,12.710,13.502,14.295,15.087,15.879,16.672,17.464,18.256,19.048,19.841,20.633,21.425,22.218,23.010,23.802,24.991,25.189,25.387,26.179,26.972,27.764,28.160,28.556,29.349,30.141,30.933,31.329,31.611,31.725,32.320,32.518,33.310,34.102,34.499,34.895,35.687,36.479,37.272,37.668,38.064,38.856,39.649,40.441,40.837,41.233,42.025,42.818,43.610,44.006,44.402,45.195,45.987,46.779,47.176,47.572,48.364,49.156,49.949,50.741,51.533,52.326,53.118,53.910,54.702,55.495,56.287,57.079,57.872,58.664,59.456,60.249,61.041,61.833,62.626,63.418,64.210,65.003,65.795,66.587,67.379,68.172,68.964,69.756,70.549,71.341,72.133,72.926,73.718,74.510,75.303,75.501,75.946,76.095,76.887,77.679,78.472,78.868,79.132,80.056,80.849,81.641,82.037,82.433,82.829,83.226,84.018,84.810,85.206,85.603,86.395,87.187,87.980,88.376,88.772,89.564,90.356,91.149,91.545,91.941,92.733,93.526,94.318,94.714,94.997,95.110,95.903,96.695,97.487,97.883,98.280,99.072,99.864,100.656,101.449,102.241,103.033,103.826,104.618,105.410,106.203,106.995,107.787,108.580];
+const HIT_A = [0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.62,0.90,0.97,0.99,1.00,1.00,0.85,0.97,0.98,0.98,0.95,0.82,0.97,0.95,0.38,0.96,0.95,0.93,0.95,0.99,0.96,0.97,0.94,0.92,0.98,1.00,0.94,0.99,0.86,0.96,0.96,0.95,0.98,0.90,0.95,0.94,0.92,0.91,0.94,0.97,0.95,0.91,0.70,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.42,0.38,0.38,0.97,0.97,1.00,1.00,0.96,0.91,0.95,0.95,0.96,0.94,0.81,0.97,0.38,0.96,0.94,0.93,0.93,0.98,0.96,0.99,0.97,0.95,0.98,1.00,0.97,1.00,0.83,0.94,1.00,0.92,0.95,0.85,0.96,0.92,0.96,0.92,0.92,0.92,0.95,0.94,0.90,0.89,0.41,0.40,0.38,0.37,0.36,0.35,0.34,0.32,0.31,0.30];
+const HIT_N = HIT_T.length;
+
+/* ручная подстройка синхронизации (клавиши [ и ]), мс — сохраняется */
+const storeGet = k => { try{ return localStorage.getItem(k); }catch(e){ return null; } };
+const storeSet = (k, v) => { try{ localStorage.setItem(k, v); }catch(e){} };
+let syncTrim = +(storeGet('rbxSync') || 0) || 0;
+
+/* гладкие часы трека: currentTime дёргается по кадрам — экстраполируем по часам AudioContext */
+let anchorCtx = 0, anchorTrack = 0;
+function smoothTrackT(){
+  const elT = audioEl.currentTime || 0;
+  if(!audioCtx || audioEl.paused){ anchorTrack = elT; anchorCtx = audioCtx ? audioCtx.currentTime : 0; return elT; }
+  const est = anchorTrack + (audioCtx.currentTime - anchorCtx);
+  if(Math.abs(est - elT) > .06){ anchorTrack = elT; anchorCtx = audioCtx.currentTime; return elT; }
+  return est;
+}
+/* задержка вывода: визуал должен совпасть с тем, что СЛЫШНО, а не с тем, что отдано в граф */
+function outLatency(){
+  if(!audioCtx) return 0;
+  return Math.min(Math.max(audioCtx.outputLatency || audioCtx.baseLatency || 0, 0), .18);
+}
+
+/* ---------------- ФОРМА КИВКА ----------------
+   d — время относительно удара. Пик наклона ровно в момент удара (d = 0):
+   за ~70 мс до него голова уже летит вниз, после — упругий отскок с лёгким
+   перелётом назад. Такой кивок читается как живой, а не как твич от кадра. */
+const NOD_PRE = .07, NOD_W = 16, NOD_DECAY = 7.5;
+const NOD_NORM = 1/(Math.exp(-NOD_DECAY*NOD_PRE)*Math.sin(NOD_W*NOD_PRE));
+function nodShape(d){
+  const x = d + NOD_PRE;
+  if(x <= 0) return 0;
+  return Math.exp(-NOD_DECAY*x)*Math.sin(NOD_W*x)*NOD_NORM;
+}
+
+/* скан карты: суммируем кивки от близких ударов (двойной удар = двойной кивок) */
+let hitPtr = 0, lastFired = -99, hitFired = false, nodNow = 0, beatNow = 0;
+function beatScan(t){
+  nodNow = 0; beatNow = 0; hitFired = false;
+  while(hitPtr > 0 && HIT_T[hitPtr-1] > t - .6) hitPtr--;
+  while(hitPtr < HIT_N && HIT_T[hitPtr] < t - .6) hitPtr++;
+  for(let i = hitPtr; i < HIT_N; i++){
+    if(HIT_T[i] > t + .1) break;
+    const d = t - HIT_T[i];
+    if(d > -.1 && d < .55) nodNow += HIT_A[i]*nodShape(d);
+    if(d >= 0){
+      if(d < .55) beatNow = Math.max(beatNow, HIT_A[i]*Math.exp(-d/.12));
+      if(HIT_T[i] > lastFired){ lastFired = HIT_T[i]; hitFired = true; }
+    }
+  }
+}
+function resetBeats(){
+  hitPtr = 0; lastFired = -99; nodNow = 0; beatNow = 0;
+  anchorTrack = audioEl.currentTime || 0;
+  anchorCtx = audioCtx ? audioCtx.currentTime : 0;
+}
+
+function initAudio(){
+  try{
+    audioCtx ??= new (window.AudioContext || window.webkitAudioContext)();
+    if(analyser) return;
+    const src = audioCtx.createMediaElementSource(audioEl);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = .62;
+    src.connect(analyser);
+    analyser.connect(audioCtx.destination);
+    freqArr = new Uint8Array(analyser.frequencyBinCount);
+    anchorTrack = audioEl.currentTime || 0;
+    anchorCtx = audioCtx.currentTime;
+  }catch(e){}
+}
+/* перемотка / пауза / луп — пересинхронизация карты и часов */
+audioEl.addEventListener('seeked', resetBeats);
+audioEl.addEventListener('play', resetBeats);
+
+/* [ ] — подстройка синхронизации на слух */
+const syncToastEl = $('#syncToast');
+let syncToastTimer = 0;
+function syncToast(msg){
+  if(!syncToastEl) return;
+  syncToastEl.textContent = msg;
+  syncToastEl.classList.add('on');
+  clearTimeout(syncToastTimer);
+  syncToastTimer = setTimeout(()=> syncToastEl.classList.remove('on'), 1200);
+}
+addEventListener('keydown', e=>{
+  if(e.key !== '[' && e.key !== ']') return;
+  syncTrim = Math.max(-150, Math.min(150, syncTrim + (e.key === ']' ? 5 : -5)));
+  storeSet('rbxSync', syncTrim);
+  syncToast('синхронизация ' + (syncTrim > 0 ? '+' : '') + syncTrim + ' мс');
+  resetBeats();
+});
+
+function setBrand(music){
+  $('#brandSub').textContent = music ? 'RUSSIAN' : '';
+  document.title = music ? 'ROBLOX RUSSIAN — Вселенная' : 'ROBLOX — Вселенная';
+}
+function beginIntro(){
+  document.body.classList.add('ready');
+  setTimeout(()=> document.body.classList.remove('soapy'), 350);  /* мыло → резкость */
+  flyTo(nightMode ? camViews.night : camViews.home, 2.8);
+  pulse(.2);
+  setTimeout(()=>{ $$('.panel').forEach(p => p.classList.toggle('active', p.dataset.view === 'home')); wave(); }, 1100);
+}
+/* полный вайб: кепка + адидас + лицо подката — в момент включения музыки */
+function suitUp(){
+  dressed = true;
+  faceMode = 'smirk';
+  applyFace();
+  dressUp('#141414','#141414');
+  capDrop();
+  shoeL.visible = shoeR.visible = true;
+  popParts();
+  updateSwatches();
+}
+$('#enterBtn').addEventListener('click', ()=>{
+  entered = true;
+  initAudio();
+  setMode('day', true);
+  suitUp();
+  beginIntro();
+});
+$('#enterMute').addEventListener('click', ()=>{
+  entered = true;
+  setMode('night', true);
+  beginIntro();
+});
+
+/* ================= resize ================= */
+addEventListener('resize', ()=>{
+  camera.aspect = innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+});
+
+/* ================= main loop ================= */
+const clock = new THREE.Clock();
+let lastTrackT = -1, lookYaw = 0, lookPit = 0;
+let nightK = 0;
+const lookV = new THREE.Vector3();
+function loop(){
+  requestAnimationFrame(loop);
+  const dt = Math.min(clock.getDelta(), .05);
+  const t = clock.elapsedTime;
+  const now = performance.now();
+  runAnims(now);
+
+  /* ---- ночной режим: плавно гасим день, зажигаем костёр ---- */
+  nightK += ((nightMode ? 1 : 0) - nightK) * Math.min(1, dt*2.2);
+  const night = nightK;
+  domeMat.uniforms.uNight.value = night;
+  scene.fog.density = .028 + .014*night;
+  key.intensity = 2.4 - 1.7*night;
+  key.color.copy(DAY_KEY).lerp(NIGHT_KEY, night);
+  ambient.intensity = .55 - .29*night;
+  redLight.intensity = 26*(1 - night);
+  cyanLight.intensity = 22*(1 - night);
+  rimLight.intensity = 1.5 + 1.4*night;
+  moonSpot.intensity = 6.5*night;
+  fireGroup.visible = night > .02;
+  bench.visible = night > .02;
+  if(fireGroup.visible){
+    for(const f of flames){
+      const u = f.userData;
+      const k = .55 + Math.sin(t*u.sp + u.phase)*.28 + Math.sin(t*u.sp*2.7 + u.phase)*.14;
+      f.scale.set(u.base*(1.0 + k*.35), u.base*(1.5 + k*.7), 1);
+      f.material.opacity = night*(.22 + k*.3);
+      f.position.y = .34 + k*.14;
+    }
+    for(const e of embers){
+      const u = e.userData;
+      const ph = (t*u.speed + u.phase) % 2.4;
+      e.position.set(u.x + Math.sin(t*2.1 + u.phase)*.18, .3 + ph, u.z + Math.cos(t*1.7 + u.phase)*.18);
+      e.material.opacity = night*Math.max(0, 1 - ph/2.4)*.85;
+    }
+    fireLight.intensity = night*(4.2 + Math.sin(t*9.3)*1.1 + Math.sin(t*17.7)*.5);
+    fireFill.intensity = night*(6.2 + Math.sin(t*11.7 + 1.3)*1.2 + Math.sin(t*19.3)*.5);
+  }
+
+  /* ---- бит: берём момент, который СЕЙЧАС слышно (медиа-часы + задержка вывода + подстройка) ---- */
+  const trackT = smoothTrackT();
+  if(Math.abs(trackT - lastTrackT) > .5) resetBeats();   // перемотка или луп трека
+  lastTrackT = trackT;
+  const heardT = trackT + outLatency() + syncTrim/1000;
+  beatScan(musicMode ? heardT : -1000);                   // кач только в «звуковом» режиме
+  /* «приглушение»: чем тише звук или мьют — тем спокойнее эффекты */
+  const volK = muted ? 0 : masterVol/100;
+  fxK += (volK - fxK) * Math.min(1, dt*3.5);
+  kick = (musicMode ? beatNow : 0) * fxK;
+  if(musicMode && hitFired){ pulse(.18*(.35 + .65*fxK)); faceOnBeat(beatNow); }
+  updateFace(dt, t);                                        // мимика: только лицо, тело не трогаем
+
+  if(analyser && !audioEl.paused && !audioEl.muted){
+    analyser.getByteFrequencyData(freqArr);
+    let bsum = 0; for(let i=1;i<=10;i++) bsum += freqArr[i];
+    bass = bsum/10/255;
+    let msum = 0; for(let i=11;i<=48;i++) msum += freqArr[i];
+    energy = Math.min(energy + ((bass*1.3 + msum/38/255) - energy)*.15, .85);
+    bassAvg += (bass - bassAvg)*.045;
+  } else {
+    bass *= .95;
+    energy *= .95;
+  }
+  flashEl.style.opacity = (Math.max(0, kick - .55)/.45*.5).toFixed(3);   // вспышка только на сильных ударах
+  const hard = Math.max(0, (kick - .55)/.45);                           // 0 — лёгкая доля, 1 — жирный удар
+
+  /* shader uniforms */
+  domeMat.uniforms.uTime.value = t;
+  domeMat.uniforms.uEnergy.value = energy;
+  pMat.uniforms.uTime.value = t;
+  pMat.uniforms.uEnergy.value = energy;
+  ringRedMat.uniforms.uTime.value = t;
+  ringRedMat.uniforms.uKick.value = kick;
+  ringCyanMat.uniforms.uTime.value = t;
+  ringCyanMat.uniforms.uKick.value = kick;
+  bloom.strength = Math.min(.45 + bass*.35 + kick*.55, 1.45)*(1 - .45*night);
+
+  /* island float */
+  island.position.y = Math.sin(t*.6)*.14 + bass*.06;
+  island.rotation.y = Math.sin(t*.15)*.05;
+
+  /* camera tween */
+  if(camTween){
+    const k = Math.min((now-camTween.t0)/camTween.dur, 1);
+    const e = easeInOut(k);
+    camBase.lerpVectors(camTween.p0, camTween.p1, e);
+    lookBase.lerpVectors(camTween.l0, camTween.l1, e);
+    if(k >= 1) camTween = null;
+  }
+
+  /* parallax + idle drift */
+  mouse.x += (mouse.tx - mouse.x)*.05;
+  mouse.y += (mouse.ty - mouse.y)*.05;
+  camera.position.set(
+    camBase.x + mouse.x*.55,
+    camBase.y - mouse.y*.35 + Math.sin(t*.5)*.08,
+    camBase.z
+  );
+  camera.lookAt(lookBase.x + mouse.x*.25, lookBase.y - mouse.y*.18, lookBase.z);
+  /* edit-style shake — только на сильных ударах, чтобы не трясло на каждом кивке */
+  if(hard > .02){
+    camera.position.x += (Math.random()-.5)*hard*.5;
+    camera.position.y += (Math.random()-.5)*hard*.4;
+    camera.rotation.z += (Math.random()-.5)*hard*.06;
+  }
+  camera.fov = 55 - hard*5;
+  camera.updateProjectionMatrix();
+
+  /* block pulse ripple (nav + beat) */
+  const pt = (now - pulseT0)/900;
+  if(pt < 1.4){
+    for(const b of blocks){
+      const local = pt*1.5 - b.delay;
+      const s = (local > 0 && local < 1) ? 1 + pulseAmp*Math.sin(local*Math.PI) : 1;
+      b.m.scale.setScalar(s);
+    }
+  }
+
+  /* floaters */
+  for(const f of floaters){
+    if(f.spin){
+      f.o.rotation.x += f.spin.x*.01;
+      f.o.rotation.y += f.spin.y*.01;
+    }
+    f.o.position.y = f.base.y + Math.sin(t*f.speed + f.phase)*.22;
+  }
+  logo.rotation.y = Math.sin(t*.4)*.3;
+
+
+  /* ================= аватар: кивок по ударам + голова следит за камерой ================= */
+  const groove = musicMode && !audioEl.muted && !audioEl.paused;   // кач только в «звуковом» режиме
+  const nod = groove ? Math.min(nodNow, 1.15)*fxK : 0;
+  const nodC = Math.min(nod, 1);
+  const sitK = night;                                              // 0 — стоим, 1 — сидим у костра
+
+  /* взгляд на камеру: считаем направление в системе координат аватара */
+  lookV.copy(camera.position);
+  avatar.worldToLocal(lookV);
+  lookV.y -= 2.44;                                             // центр головы в локале аватара
+  const yawT = Math.atan2(lookV.x, lookV.z);
+  const pitT = Math.atan2(lookV.y, Math.hypot(lookV.x, lookV.z));
+  const kLook = Math.min(1, dt*7);
+  lookYaw += (Math.max(-.95, Math.min(.95, yawT)) - lookYaw)*kLook;
+  lookPit += (Math.max(-.4, Math.min(.4, pitT)) - lookPit)*kLook;
+
+  neck.rotation.x = nod*.46 + lookPit*.9 + sitK*.05;           // кивок + взгляд вверх/вниз
+  neck.rotation.z = nod*.045;                                  // лёгкий крен, чтобы не как робот
+  neck.rotation.y = lookYaw*.8 + Math.sin(t*.7)*.05*(1 - nodC); // поворот к камере + покачивание
+  avatar.rotation.x = nod*.085 + sitK*.03;                     // корпус чуть вперёд
+  avatar.rotation.y = sitK*.8;                                 // развёрнут к костру
+  avatar.position.y = .5 + Math.sin(t*2)*.02 + bass*.06 - nod*.05 - .5*sitK;
+  avatar.position.z = 1.3 - .15*sitK;
+  legL.rotation.x = -1.48*sitK;
+  legR.rotation.x = -1.42*sitK;
+  legL.userData.knee.rotation.x = 1.44*sitK;
+  legR.userData.knee.rotation.x = 1.38*sitK;
+  window.__kick = kick; window.__nod = nod; window.__face = faceState;
+
+  if(waving){
+    /* махи рукой по кнопке — не прерываем кивком */
+    armL.rotation.x = Math.sin(t*1.3)*.07;
+    armR.rotation.z = -2.45 + Math.sin(t*10)*.35;
+    armR.rotation.x = 0;
+  } else if(sitK > .5){
+    /* сидит у костра: руки на коленях, лёгкое дыхание */
+    armL.rotation.x = -.3 + Math.sin(t*1.05)*.05;
+    armR.rotation.x = -.3 + Math.sin(t*1.05 + 1.1)*.05;
+    armL.rotation.z += (-.2 - armL.rotation.z)*.08;
+    armR.rotation.z += ( .2 - armR.rotation.z)*.08;
+  } else if(nod > .04){
+    /* на ударе руки висят ровно — никакого махания */
+    armL.rotation.x += (0 - armL.rotation.x)*.2;
+    armR.rotation.z += (0 - armR.rotation.z)*.2;
+    armR.rotation.x += (0 - armR.rotation.x)*.2;
+  } else {
+    armL.rotation.x = Math.sin(t*1.3)*.07;
+    armR.rotation.z += ((Math.sin(t*1.3+1)*.07) - armR.rotation.z)*.1;
+    armR.rotation.x = Math.sin(t*1.3+1)*.07;
+  }
+
+  /* particles + glows */
+  particles.rotation.y = t*.012;
+  glowR.material.opacity = .3 + Math.sin(t*.8)*.07 + bass*.18;
+  glowC.material.opacity = .26 + Math.sin(t*.8+2)*.07 + bass*.15;
+
+  composer.render();
+}
+/* отладочный доступ: камера и скины для скриншотов */
+window.__rbx = { camera, camBase, lookBase, camViews, flyTo, applySkin, setMode, avatar, scene, faceState };
+
+loop();
+</script>
+</body>
+</html>
